@@ -10,6 +10,7 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 from django.urls import reverse
+from apps.common.notifications import notify_role
 
 from .models import RestockRequest, RestockLine, WarehousePurchaseRequest, WarehousePurchaseLine
 from apps.inventory.models import SalesPointStock, StockTransaction, SalesPoint
@@ -643,7 +644,7 @@ def warehouse_journal(request):
 @login_required
 def api_wh_restock_lines(request, req_id: int):
     """Return JSON lines for a RestockRequest for use by the inbound modal."""
-    if not (request.user.is_superuser or getattr(request.user, 'role', '') in ['warehouse_mgr'] or getattr(request.user, 'is_staff', False)):
+    if not (request.user.is_superuser or getattr(request.user, 'role', '') in ['warehouse_mgr','commercial_dir'] or getattr(request.user, 'is_staff', False)):
         return JsonResponse({'ok': False, 'error': 'Accès refusé.'}, status=403)
     req = get_object_or_404(RestockRequest.objects.select_related('provider'), pk=req_id)
     lines = []
@@ -1831,6 +1832,11 @@ def api_wh_restock_validate(request, req_id: int):
         req.validated_at = timezone.now()
         req.save(update_fields=['status', 'validated_at', 'updated_at'])
 
+    # Notify Commercial Director about validation
+    try:
+        notify_role('commercial_dir', f"Approvisionnement validé • {req.reference} • {len(moved)} produit(s)", link='/sales/commercial/journal/', kind='commercial_restock_validated')
+    except Exception:
+        pass
     return JsonResponse({'ok': True, 'moved': moved, 'request_id': req.id, 'status': req.status})
 
 
