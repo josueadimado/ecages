@@ -116,6 +116,7 @@ from django.utils.dateparse import parse_date   # <-- add this line
 from apps.inventory.models import SalesPointStock, Transfer
 from apps.inventory.models import RestockRequest, RestockLine, TransferRequest, TransferRequestLine, SalesPoint
 from apps.products.models import Product
+from apps.providers.models import Provider
 from .models import Notification
 from .models import Sale, SaleItem, CancellationRequest
 from .services import (
@@ -2612,3 +2613,72 @@ def commercial_products_table_partial(request):
 
 
 # commercial API views moved to apps/sales/views/commercial.py
+
+
+@login_required
+def commercial_journal(request):
+    """Journal des approvisionnements réalisés par le Directeur Commercial.
+    Affiche les demandes envoyées à l'entrepôt avec filtres et pagination.
+    """
+    if not (request.user.is_superuser or getattr(request.user, 'role', '') == 'commercial_dir'):
+        return redirect('sales:dashboard')
+
+    qs = (
+        RestockRequest.objects.select_related('provider', 'requested_by', 'salespoint')
+        .filter(requested_by=request.user)
+        .order_by('-created_at')
+    )
+
+    q = (request.GET.get('q') or '').strip()
+    status = (request.GET.get('status') or '').strip()
+    provider_id_raw = (request.GET.get('provider') or '').strip()
+    provider_id = int(provider_id_raw) if provider_id_raw.isdigit() else 0
+    df = parse_date(request.GET.get('from') or '')
+    dt = parse_date(request.GET.get('to') or '')
+    if not df and not dt:
+        today = timezone.localdate()
+        df = dt = today
+
+    if q:
+        qs = qs.filter(Q(reference__icontains=q) | Q(invoice_number__icontains=q))
+    if status:
+        qs = qs.filter(status=status)
+    if provider_id > 0:
+        qs = qs.filter(provider_id=provider_id)
+    if df:
+        qs = qs.filter(created_at__date__gte=df)
+    if dt:
+        qs = qs.filter(created_at__date__lte=dt)
+
+    totals = qs.aggregate(total_amount=Sum('total_amount'), count=Count('id'))
+
+    # Pagination
+    try:
+        per_raw = int(request.GET.get('per') or 50)
+    except Exception:
+        per_raw = 50
+    per = per_raw if per_raw in {25, 50, 100} else 50
+    paginator = Paginator(qs, per)
+    page_number = request.GET.get('page') or 1
+    try:
+        page_obj = paginator.get_page(page_number)
+    except (PageNotAnInteger, EmptyPage):
+        page_obj = paginator.get_page(1)
+
+    providers = Provider.objects.filter(is_active=True).order_by('name')
+
+    context = {
+        'rows': page_obj.object_list,
+        'paginator': paginator,
+        'page_obj': page_obj,
+        'totals': totals,
+        'q': q,
+        'status': status,
+        'provider_id': provider_id,
+        'date_from': df.isoformat() if df else '',
+        'date_to': dt.isoformat() if dt else '',
+        'per': per,
+        'providers': providers,
+        'back_url': reverse('sales:commercial_dashboard'),
+    }
+    return render(request, 'sales/commercial/commercial_journal.html', context)

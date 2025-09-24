@@ -18,6 +18,7 @@ urlpatterns = [
     path("manager-dashboard/", sales_views.manager_dashboard, name="manager_dashboard"),
     path("commercial-dashboard/", sales_views.commercial_dashboard, name="commercial_dashboard"),
     path("commercial-dashboard/table/", sales_views.commercial_products_table_partial, name="commercial_products_table_partial"),
+    path("commercial/journal/", sales_views.commercial_journal, name="commercial_journal"),
     # Modularized role routes
     path("", include("apps.sales.urls_commercial")),
     path("", include("apps.sales.urls_manager")),

@@ -1,0 +1,102 @@
+{% extends "layouts/base_sales.html" %}
+{% block title %}Journal d'approvisionnement (Commercial){% endblock %}
+
+{% block extra_css %}
+<style>
+  .card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:16px; }
+  .filters { display:grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap:12px; }
+  .table { width:100%; border-collapse:collapse; }
+  .table th, .table td { padding:10px 12px; border-bottom:1px solid #f1f5f9; text-align:left; }
+  .status { font-weight:700; padding:4px 8px; border-radius:999px; font-size:.8rem; }
+  .status.sent { background:#fef3c7; color:#92400e; border:1px solid #f59e0b; }
+  .status.partially_validated { background:#dbeafe; color:#1e3a8a; border:1px solid #60a5fa; }
+  .status.validated { background:#dcfce7; color:#166534; border:1px solid #86efac; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page">
+  <div class="ribbon"><div class="marquee"><span>ECAGES • Journal d'approvisionnement (Commercial)</span></div></div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <form method="get" class="filters">
+      <input type="text" name="q" value="{{ q|default:'' }}" placeholder="Réf./Facture…" />
+      <select name="status">
+        <option value="">Statut (tous)</option>
+        {% for s in 'draft,sent,partially_validated,validated,cancelled'.split(',') %}
+        <option value="{{ s }}" {% if status==s %}selected{% endif %}>{{ s|capfirst }}</option>
+        {% endfor %}
+      </select>
+      <select name="provider">
+        <option value="0">Fournisseur (tous)</option>
+        {% for p in providers %}
+        <option value="{{ p.id }}" {% if provider_id==p.id %}selected{% endif %}>{{ p.name }}</option>
+        {% endfor %}
+      </select>
+      <input type="date" name="from" value="{{ date_from }}" />
+      <input type="date" name="to" value="{{ date_to }}" />
+      <select name="per">
+        {% for n in 25 50 100 %}
+        <option value="{{ n }}" {% if per==n %}selected{% endif %}>{{ n }}/page</option>
+        {% endfor %}
+      </select>
+      <button class="btn-primary" type="submit">Filtrer</button>
+      <a href="{{ back_url }}" class="btn-secondary">Retour</a>
+    </form>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <div style="display:flex; gap:16px; flex-wrap:wrap;">
+      <div><strong>Total demandes:</strong> {{ totals.count|default:0 }}</div>
+      <div><strong>Montant cumulé:</strong> {{ totals.total_amount|default:0|floatformat:0 }} FCFA</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Référence</th>
+          <th>Fournisseur</th>
+          <th>Montant</th>
+          <th>Statut</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>{{ r.created_at|date:"d/m/Y H:i" }}</td>
+          <td>{{ r.reference }}</td>
+          <td>{{ r.provider.name|default:'—' }}</td>
+          <td>{{ r.total_amount|floatformat:0 }} FCFA</td>
+          <td>
+            <span class="status {{ r.status }}">
+              {% if r.status == 'validated' %}Validée{% elif r.status == 'partially_validated' %}Partielle{% elif r.status == 'sent' %}Envoyée{% else %}{{ r.status|capfirst }}{% endif %}
+            </span>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" style="text-align:center; padding:24px; color:#64748b;">Aucune demande trouvée</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% if page_obj.has_other_pages %}
+    <div class="pagination" style="display:flex; gap:8px; justify-content:center; margin-top:12px;">
+      {% if page_obj.has_previous %}
+        <a class="btn-secondary" href="?page=1">« Première</a>
+        <a class="btn-secondary" href="?page={{ page_obj.previous_page_number }}">‹ Précédente</a>
+      {% endif %}
+      <span class="btn-secondary" style="background:#580706;color:#fff;border-color:#580706;">Page {{ page_obj.number }} / {{ paginator.num_pages }}</span>
+      {% if page_obj.has_next %}
+        <a class="btn-secondary" href="?page={{ page_obj.next_page_number }}">Suivante ›</a>
+        <a class="btn-secondary" href="?page={{ paginator.num_pages }}">Dernière »</a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+
