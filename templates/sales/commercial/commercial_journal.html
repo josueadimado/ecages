@@ -19,30 +19,50 @@
   <div class="ribbon"><div class="marquee"><span>ECAGES • Journal d'approvisionnement (Commercial)</span></div></div>
 
   <div class="card" style="margin-bottom:16px;">
-    <form method="get" class="filters">
-      <input type="text" name="q" value="{{ q|default:'' }}" placeholder="Réf./Facture…" />
-      <select name="status">
+    <form method="get" class="filters" style="align-items:end;">
+      <div>
+        <label style="display:block; font-weight:600; color:#374151; margin-bottom:6px;">Recherche</label>
+        <input type="text" name="q" value="{{ q|default:'' }}" placeholder="Réf./Facture…" />
+      </div>
+      <div>
+        <label style="display:block; font-weight:600; color:#374151; margin-bottom:6px;">Statut</label>
+        <select name="status">
         <option value="">Statut (tous)</option>
         <option value="draft" {% if status == 'draft' %}selected{% endif %}>Draft</option>
         <option value="sent" {% if status == 'sent' %}selected{% endif %}>Envoyée</option>
         <option value="partially_validated" {% if status == 'partially_validated' %}selected{% endif %}>Partielle</option>
         <option value="validated" {% if status == 'validated' %}selected{% endif %}>Validée</option>
         <option value="cancelled" {% if status == 'cancelled' %}selected{% endif %}>Annulée</option>
-      </select>
-      <select name="provider">
+        </select>
+      </div>
+      <div>
+        <label style="display:block; font-weight:600; color:#374151; margin-bottom:6px;">Fournisseur</label>
+        <select name="provider">
         <option value="0">Fournisseur (tous)</option>
         {% for p in providers %}
         <option value="{{ p.id }}" {% if provider_id == p.id %}selected{% endif %}>{{ p.name }}</option>
         {% endfor %}
-      </select>
-      <input type="date" name="from" value="{{ date_from }}" />
-      <input type="date" name="to" value="{{ date_to }}" />
-      <select name="per">
+        </select>
+      </div>
+      <div>
+        <label style="display:block; font-weight:600; color:#374151; margin-bottom:6px;">Du</label>
+        <input type="date" name="from" value="{{ date_from }}" />
+      </div>
+      <div>
+        <label style="display:block; font-weight:600; color:#374151; margin-bottom:6px;">Au</label>
+        <input type="date" name="to" value="{{ date_to }}" />
+      </div>
+      <div>
+        <label style="display:block; font-weight:600; color:#374151; margin-bottom:6px;">Par page</label>
+        <select name="per">
         <option value="25" {% if per == 25 %}selected{% endif %}>25/page</option>
         <option value="50" {% if per == 50 %}selected{% endif %}>50/page</option>
         <option value="100" {% if per == 100 %}selected{% endif %}>100/page</option>
-      </select>
-      <button class="btn-primary" type="submit">Filtrer</button>
+        </select>
+      </div>
+      <div>
+        <button class="btn-primary" type="submit">Filtrer</button>
+      </div>
       <a href="{{ back_url }}" class="btn-secondary">Retour</a>
     </form>
   </div>
