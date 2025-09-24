@@ -25,6 +25,7 @@ urlpatterns = [
     path('api/wh/stock/', views.api_wh_stock, name='api_wh_stock'),
     path('api/wh/restock/send/', views.api_wh_restock_send, name='api_wh_restock_send'),
     path('api/wh/restock/validate/<int:req_id>/', views.api_wh_restock_validate, name='api_wh_restock_validate'),
+    path('api/wh/restock/<int:req_id>/lines/', views.api_wh_restock_lines, name='api_wh_restock_lines'),
     path('api/wh/salespoints/', views.api_wh_salespoints, name='api_wh_salespoints'),
     path('api/wh/ref/', views.api_wh_ref, name='api_wh_ref'),
     # APIs for warehouse commande

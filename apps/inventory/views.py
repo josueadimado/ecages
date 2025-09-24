@@ -543,8 +543,8 @@ def warehouse_journal(request):
     
     # Get all restock requests from warehouse
     qs = RestockRequest.objects.select_related('salespoint').prefetch_related('lines__product').order_by('-created_at')
-    # Exclude salespoint request references (WH-RQ-...), show warehouse-issued restocks only
-    qs = qs.exclude(reference__startswith='WH-RQ-')
+    # Exclude salespoint requests (WH-RQ-...) and inbound from Commercial Director (CD-...)
+    qs = qs.exclude(reference__startswith='WH-RQ-').exclude(reference__startswith='CD-')
     
     # Apply filters
     if status_filter == 'not_validated':
@@ -638,6 +638,23 @@ def warehouse_journal(request):
         'salespoints': SalesPoint.objects.filter(is_warehouse=False).order_by('name'),
         'sp_id': sp_id,
     })
+
+
+@login_required
+def api_wh_restock_lines(request, req_id: int):
+    """Return JSON lines for a RestockRequest for use by the inbound modal."""
+    if not (request.user.is_superuser or getattr(request.user, 'role', '') in ['warehouse_mgr'] or getattr(request.user, 'is_staff', False)):
+        return JsonResponse({'ok': False, 'error': 'Accès refusé.'}, status=403)
+    req = get_object_or_404(RestockRequest.objects.select_related('provider'), pk=req_id)
+    lines = []
+    for ln in req.lines.select_related('product','product__brand').all():
+        qty = int(ln.quantity or ln.quantity_requested or 0)
+        lines.append({
+            'product_id': ln.product_id,
+            'product': f"{ln.product.name} {('• ' + ln.product.brand.name) if ln.product.brand_id else ''}",
+            'qty': qty,
+        })
+    return JsonResponse({'ok': True, 'reference': req.reference or '', 'provider': getattr(req.provider, 'name', ''), 'lines': lines})
 
 
 @login_required
