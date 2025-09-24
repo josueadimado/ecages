@@ -464,15 +464,24 @@ window.submitRestock = async function() {
       const currentNumber = parseInt(localStorage.getItem(todayKey) || '0');
       localStorage.setItem(todayKey, (currentNumber + 1).toString());
       
-      alert(`Demande de ravitaillement ${currentKind === 'moto' ? 'Motos' : 'Pièces'} envoyée avec succès\nFacture: ${invoiceNumber}`);
+      try {
+        if (typeof window.showNotice === 'function') {
+          const kindLabel = currentKind === 'moto' ? 'Motos' : 'Pièces';
+          window.showNotice('Succès', `Demande de ravitaillement ${kindLabel} envoyée avec succès • Facture: ${invoiceNumber}`, 'success');
+        }
+      } catch (_) {}
       closeRestockModal();
       // Optionally refresh the page or update UI
     } else {
-      alert('Erreur: ' + (result.message || 'Impossible d\'envoyer la demande'));
+      if (typeof window.showNotice === 'function') {
+        window.showNotice('Erreur', (result.message || "Impossible d'envoyer la demande"), 'error');
+      }
     }
   } catch (error) {
     console.error('Error submitting restock:', error);
-    alert('Erreur lors de l\'envoi de la demande');
+    if (typeof window.showNotice === 'function') {
+      window.showNotice('Erreur', "Erreur lors de l'envoi de la demande", 'error');
+    }
   }
 }
 
