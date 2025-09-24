@@ -1778,54 +1778,78 @@ def api_wh_restock_validate(request, req_id: int):
     except Exception:
         selected_ids = None
 
+    # Determine if this is an inbound from Commercial Director (destination is warehouse)
+    is_cd_inbound = (getattr(req, 'reference', '') or '').startswith('CD-') or (getattr(req.salespoint, 'is_warehouse', False) and getattr(req, 'provider', None))
+
     # Simple availability check and movement
     moved = []
     with transaction.atomic():
-        for ln in req.lines.select_related('product').all():
-            if selected_ids is not None and ln.product_id not in selected_ids:
+        # Use Commercial Director items if present; otherwise fallback to lines
+        cd_items = list(getattr(req, 'items', []).select_related('product').all()) if hasattr(req, 'items') else []
+        iterable = cd_items if cd_items else list(req.lines.select_related('product').all())
+        for obj in iterable:
+            product = getattr(obj, 'product', None)
+            pid = getattr(product, 'id', getattr(obj, 'product_id', None))
+            if not product or not pid:
                 continue
-            qty = int(ln.quantity_approved or ln.quantity_requested or ln.quantity or 0)
+            if selected_ids is not None and pid not in selected_ids:
+                continue
+            qty = int(getattr(obj, 'quantity_approved', None) or getattr(obj, 'quantity_requested', None) or getattr(obj, 'quantity', 0) or 0)
             if qty <= 0:
                 continue
-            # Update destination salespoint stock (transfer_in += qty)
+
+            # Always add to destination (req.salespoint)
             sps_dest, _ = SalesPointStock.objects.select_for_update().get_or_create(
                 salespoint=req.salespoint,
-                product=ln.product,
+                product=product,
                 defaults={'opening_qty': 0},
             )
             SalesPointStock.objects.filter(pk=sps_dest.pk).update(transfer_in=F('transfer_in') + qty)
 
-            # Update warehouse stock (transfer_out += qty)
-            sps_wh, _ = SalesPointStock.objects.select_for_update().get_or_create(
-                salespoint=warehouse_sp,
-                product=ln.product,
-                defaults={'opening_qty': 0},
-            )
-            SalesPointStock.objects.filter(pk=sps_wh.pk).update(transfer_out=F('transfer_out') + qty)
+            if not is_cd_inbound:
+                # For outbound from warehouse to salespoint, deduct from warehouse
+                sps_wh, _ = SalesPointStock.objects.select_for_update().get_or_create(
+                    salespoint=warehouse_sp,
+                    product=product,
+                    defaults={'opening_qty': 0},
+                )
+                SalesPointStock.objects.filter(pk=sps_wh.pk).update(transfer_out=F('transfer_out') + qty)
 
-            # Optional audit transactions
-            StockTransaction.create_transaction(
-                salespoint=warehouse_sp,
-                product=ln.product,
-                qty=-qty,
-                reason='restock',
-                reference=req.reference or f"REQ{req.id}",
-                user=request.user,
-                document_type='RestockRequest',
-                document_id=req.id,
-            )
-            StockTransaction.create_transaction(
-                salespoint=req.salespoint,
-                product=ln.product,
-                qty=qty,
-                reason='restock',
-                reference=req.reference or f"REQ{req.id}",
-                user=request.user,
-                document_type='RestockRequest',
-                document_id=req.id,
-            )
+                # Transactions: negative at warehouse, positive at destination
+                StockTransaction.create_transaction(
+                    salespoint=warehouse_sp,
+                    product=product,
+                    qty=-qty,
+                    reason='restock',
+                    reference=req.reference or f"REQ{req.id}",
+                    user=request.user,
+                    document_type='RestockRequest',
+                    document_id=req.id,
+                )
+                StockTransaction.create_transaction(
+                    salespoint=req.salespoint,
+                    product=product,
+                    qty=qty,
+                    reason='restock',
+                    reference=req.reference or f"REQ{req.id}",
+                    user=request.user,
+                    document_type='RestockRequest',
+                    document_id=req.id,
+                )
+            else:
+                # CD inbound: only positive transaction to warehouse
+                StockTransaction.create_transaction(
+                    salespoint=req.salespoint,
+                    product=product,
+                    qty=qty,
+                    reason='restock_inbound',
+                    reference=req.reference or f"REQ{req.id}",
+                    user=request.user,
+                    document_type='RestockRequest',
+                    document_id=req.id,
+                )
 
-            moved.append({'product_id': ln.product_id, 'qty': qty})
+            moved.append({'product_id': pid, 'qty': qty})
 
         # Update request status
         req.status = 'validated'
