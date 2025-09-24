@@ -4,7 +4,20 @@
 {% block extra_css %}
 <style>
   .card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:16px; }
-  .filters { display:grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap:12px; }
+  .filters { display:grid; grid-template-columns: repeat(12, 1fr); gap:12px; }
+  @media (max-width: 960px){ .filters{ grid-template-columns: repeat(6, 1fr); } }
+  @media (max-width: 640px){ .filters{ grid-template-columns: repeat(2, 1fr); } }
+  .filters .field { grid-column: span 2; }
+  .filters .field.w-3 { grid-column: span 3; }
+  .filters .field.w-4 { grid-column: span 4; }
+  .filters .field.w-6 { grid-column: span 6; }
+  .filters .actions { display:flex; align-items:flex-end; gap:10px; grid-column: span 2; }
+  .filters label { display:block; font-weight:700; color:#1f2937; margin-bottom:6px; }
+  .filters input[type="text"], .filters input[type="date"], .filters select { 
+    width:100%; height:40px; padding:8px 12px; border:1px solid #d1d5db; border-radius:10px; background:#fff; color:#111827;
+  }
+  .filters input::placeholder { color:#9ca3af; }
+  .filters input:focus, .filters select:focus { outline:none; border-color:#580706; box-shadow:0 0 0 3px rgba(88,7,6,.12); }
   .table { width:100%; border-collapse:collapse; }
   .table th, .table td { padding:10px 12px; border-bottom:1px solid #f1f5f9; text-align:left; }
   .status { font-weight:700; padding:4px 8px; border-radius:999px; font-size:.8rem; }
@@ -19,12 +32,12 @@
   <div class="ribbon"><div class="marquee"><span>ECAGES • Journal d'approvisionnement (Commercial)</span></div></div>
 
   <div class="card" style="margin-bottom:16px;">
-    <form method="get" class="filters" style="align-items:end;">
-      <div>
+    <form method="get" class="filters">
+      <div class="field w-4">
         <label style="display:block; font-weight:600; color:#374151; margin-bottom:6px;">Recherche</label>
-        <input type="text" name="q" value="{{ q|default:'' }}" placeholder="Réf./Facture…" />
+        <input type="text" name="q" value="{{ q|default:'' }}" placeholder="Réf., facture…" />
       </div>
-      <div>
+      <div class="field w-2">
         <label style="display:block; font-weight:600; color:#374151; margin-bottom:6px;">Statut</label>
         <select name="status">
         <option value="">Statut (tous)</option>
@@ -35,7 +48,7 @@
         <option value="cancelled" {% if status == 'cancelled' %}selected{% endif %}>Annulée</option>
         </select>
       </div>
-      <div>
+      <div class="field w-3">
         <label style="display:block; font-weight:600; color:#374151; margin-bottom:6px;">Fournisseur</label>
         <select name="provider">
         <option value="0">Fournisseur (tous)</option>
@@ -44,15 +57,15 @@
         {% endfor %}
         </select>
       </div>
-      <div>
+      <div class="field w-2">
         <label style="display:block; font-weight:600; color:#374151; margin-bottom:6px;">Du</label>
         <input type="date" name="from" value="{{ date_from }}" />
       </div>
-      <div>
+      <div class="field w-2">
         <label style="display:block; font-weight:600; color:#374151; margin-bottom:6px;">Au</label>
         <input type="date" name="to" value="{{ date_to }}" />
       </div>
-      <div>
+      <div class="field w-2">
         <label style="display:block; font-weight:600; color:#374151; margin-bottom:6px;">Par page</label>
         <select name="per">
         <option value="25" {% if per == 25 %}selected{% endif %}>25/page</option>
@@ -60,10 +73,10 @@
         <option value="100" {% if per == 100 %}selected{% endif %}>100/page</option>
         </select>
       </div>
-      <div>
-        <button class="btn-primary" type="submit">Filtrer</button>
+      <div class="actions">
+        <button class="btn-primary" type="submit" style="height:40px;">Filtrer</button>
+        <a href="{{ back_url }}" class="btn-secondary" style="height:40px; display:inline-flex; align-items:center;">Retour</a>
       </div>
-      <a href="{{ back_url }}" class="btn-secondary">Retour</a>
     </form>
   </div>
 
