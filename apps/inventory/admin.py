@@ -6,6 +6,8 @@ from .models import (
     WarehousePurchaseRequest, WarehousePurchaseLine,
 )
 from django.db.models import Sum, Count
+from django.urls import reverse
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 
 from apps.inventory.models import SalesPointStock, Transfer
@@ -168,7 +170,7 @@ class RestockRequestItemInline(admin.TabularInline):
 class RestockRequestAdmin(admin.ModelAdmin):
     list_display = (
         "reference", "salespoint", "provider", "requested_by", "status",
-        "created_at", "total_amount", "item_count",
+        "created_at", "total_amount", "item_count", "inbound_source", "tools",
     )
     list_filter = ("status", "salespoint", "provider", "created_at")
     search_fields = (
@@ -198,6 +200,28 @@ class RestockRequestAdmin(admin.ModelAdmin):
         """Optimize queryset with prefetch_related to avoid N+1 queries."""
         qs = super().get_queryset(request)
         return qs.prefetch_related('items')
+
+    def inbound_source(self, obj):
+        ref = (obj.reference or "").upper()
+        if ref.startswith("CD-"):
+            return "CD → Entrepôt"
+        if ref.startswith("WH-RQ-"):
+            return "PDV → Entrepôt"
+        return "—"
+    inbound_source.short_description = "Origine"
+
+    def tools(self, obj):
+        links = []
+        try:
+            links.append(f'<a target="_blank" href="{reverse("inventory:warehouse_request_print", args=[obj.id])}">Imprimer</a>')
+        except Exception:
+            pass
+        try:
+            links.append(f'<a target="_blank" href="{reverse("inventory:api_wh_restock_lines", args=[obj.id])}">JSON</a>')
+        except Exception:
+            pass
+        return mark_safe(" | ".join(links) or "—")
+    tools.short_description = "Outils"
 
 @admin.register(SalesPointStock)
 class SalesPointStockAdmin(admin.ModelAdmin):

@@ -28,7 +28,29 @@ class ECAGESAdminSite(AdminSite):
                         model['count'] = self._get_model_count(model['object_name'])
                     except Exception:
                         model['count'] = '~'
-        
+
+        # Reorder apps/models into logical groups
+        def _key(app):
+            order = {
+                'inventory': 0,
+                'sales': 1,
+                'products': 2,
+                'providers': 3,
+                'reports': 4,
+                'finance': 5,
+                'accounts': 6,
+                'auth': 7,
+            }
+            return order.get(app['app_label'], 99)
+
+        app_list.sort(key=_key)
+        for app in app_list:
+            # Pin crucial inventory models to the top
+            def _mkey(m):
+                tops = ['RestockRequest', 'SalesPointStock', 'StockTransaction', 'WarehousePurchaseRequest']
+                return (0 if m['object_name'] in tops else 1, m['name'])
+            app['models'].sort(key=_mkey)
+
         return app_list
     
     def _get_model_count(self, model_name):
