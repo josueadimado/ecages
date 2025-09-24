@@ -30,7 +30,7 @@
           <td style="padding:10px;border-bottom:1px solid #f1f5f9;">{{ r.provider.name|default:'—' }}</td>
           <td style="padding:10px;border-bottom:1px solid #f1f5f9;">{{ r.total_amount|floatformat:0 }} FCFA</td>
           <td style="padding:10px;border-bottom:1px solid #f1f5f9;">
-            <button class="btn-primary" style="display:inline-flex;align-items:center;gap:8px;border:none;padding:8px 12px;border-radius:10px;cursor:pointer;"
+            <button class="btn-primary" style="display:inline-flex;align-items:center;gap:8px;border:none;padding:10px 14px;border-radius:10px;cursor:pointer;background:linear-gradient(135deg,#6e0a0a,#8b0a0a);color:#fff;box-shadow:0 4px 10px rgba(0,0,0,.08);"
               onclick="openInboundModal({{ r.id }})">
               <span>Valider</span>
             </button>
@@ -114,7 +114,7 @@
       const selected = Array.from(body.querySelectorAll('.inb-check:checked')).map(ch=>({product_id:Number(ch.dataset.productId), qty:Number(ch.dataset.qty)}));
       if(!selected.length){ alert('Sélectionnez au moins un produit.'); return; }
       try{
-        const r = await fetch(`/inventory/api/wh/restock/validate/${reqId}/`, {method:'POST', headers:{'X-CSRFToken': (document.cookie.match('(^|;)\\s*csrftoken\\s*=\\s*([^;]+)')||[]).pop()||''}});
+        const r = await fetch(`/inventory/api/wh/restock/validate/${reqId}/`, {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken': (document.cookie.match('(^|;)\\s*csrftoken\\s*=\\s*([^;]+)')||[]).pop()||''}, body: JSON.stringify({lines: selected})});
         const res = await r.json();
         if(r.ok && res.ok){ if(window.showNotice) showNotice('Succès', 'Approvisionnement validé.', 'success'); closeInboundModal(); location.reload(); }
         else{ if(window.showNotice) showNotice('Erreur', res.error||'Validation impossible', 'error'); }

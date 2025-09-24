@@ -1756,10 +1756,24 @@ def api_wh_restock_validate(request, req_id: int):
     if not warehouse_sp:
         return JsonResponse({'ok': False, 'error': "Le point 'Entrepôt' n'est pas configuré."}, status=400)
 
+    # Optional: limit to selected lines sent by client
+    selected_ids = None
+    try:
+        payload = json.loads(request.body.decode('utf-8')) if request.body else {}
+        if isinstance(payload, dict) and isinstance(payload.get('lines'), list):
+            # Expect [{product_id, qty?}] but qty is ignored here; we use request quantities
+            selected_ids = {int(x.get('product_id')) for x in payload['lines'] if str(x.get('product_id') or '').isdigit()}
+            if not selected_ids:
+                selected_ids = None
+    except Exception:
+        selected_ids = None
+
     # Simple availability check and movement
     moved = []
     with transaction.atomic():
         for ln in req.lines.select_related('product').all():
+            if selected_ids is not None and ln.product_id not in selected_ids:
+                continue
             qty = int(ln.quantity_approved or ln.quantity_requested or ln.quantity or 0)
             if qty <= 0:
                 continue
