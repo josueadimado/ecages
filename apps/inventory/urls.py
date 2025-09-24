@@ -6,6 +6,7 @@ app_name = 'inventory'
 urlpatterns = [
     path('warehouse/', views.warehouse_dashboard, name='warehouse_dashboard'),
     path('warehouse/commande/', views.warehouse_commande, name='warehouse_commande'),
+    path('warehouse/approvisionnement/', views.warehouse_inbound_cd, name='warehouse_inbound_cd'),
     path('warehouse/requests/', views.warehouse_requests, name='warehouse_requests'),
     path('warehouse/requests/<int:req_id>/lines/', views.warehouse_request_lines, name='warehouse_request_lines'),
     path('warehouse/requests/<int:req_id>/print/', views.warehouse_request_print, name='warehouse_request_print'),

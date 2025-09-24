@@ -15,6 +15,37 @@ from .models import RestockRequest, RestockLine, WarehousePurchaseRequest, Wareh
 from apps.inventory.models import SalesPointStock, StockTransaction, SalesPoint
 from apps.products.models import Product
 from .models import TransferRequest, TransferRequestLine
+@login_required
+def warehouse_inbound_cd(request):
+    """Approvisionnement (CD -> Entrepôt): demandes en attente à confirmer."""
+    role = getattr(request.user, 'role', '')
+    if not (request.user.is_superuser or role == 'warehouse_mgr' or getattr(request.user, 'is_staff', False)):
+        return redirect('sales:dashboard')
+
+    warehouse = SalesPoint.objects.filter(is_warehouse=True).first()
+    qs = (
+        RestockRequest.objects.select_related('provider', 'requested_by')
+        .filter(salespoint=warehouse, status__in=['sent','partially_validated'])
+        .order_by('-created_at')
+    )
+
+    q = (request.GET.get('q') or '').strip()
+    if q:
+        qs = qs.filter(Q(reference__icontains=q))
+
+    from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+    paginator = Paginator(qs, 25)
+    page_number = request.GET.get('page') or 1
+    try:
+        page_obj = paginator.get_page(page_number)
+    except (PageNotAnInteger, EmptyPage):
+        page_obj = paginator.get_page(1)
+
+    return render(request, 'inventory/warehouse/warehouse_inbound_cd.html', {
+        'rows': page_obj.object_list,
+        'page_obj': page_obj,
+        'paginator': paginator,
+    })
 
 # ===== Warehouse low-stock purchase builder (to Commercial Director) =====
 
