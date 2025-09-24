@@ -4,15 +4,13 @@
 {% block extra_css %}
 <style>
   .card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:16px; }
-  .filters { display:grid; grid-template-columns: repeat(12, 1fr); gap:12px; }
-  @media (max-width: 960px){ .filters{ grid-template-columns: repeat(6, 1fr); } }
-  @media (max-width: 640px){ .filters{ grid-template-columns: repeat(2, 1fr); } }
-  .filters .field { grid-column: span 2; }
-  .filters .field.w-3 { grid-column: span 3; }
-  .filters .field.w-4 { grid-column: span 4; }
-  .filters .field.w-6 { grid-column: span 6; }
-  .filters .actions { display:flex; align-items:flex-end; gap:10px; grid-column: span 2; }
-  .filters label { display:block; font-weight:700; color:#1f2937; margin-bottom:6px; }
+  .filters { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; }
+  .filters .field { display:flex; flex-direction:column; min-width:180px; }
+  .filters .field.w-2 { min-width:160px; }
+  .filters .field.w-3 { min-width:220px; }
+  .filters .field.w-4 { min-width:280px; flex:1; }
+  .filters .actions { display:flex; gap:10px; }
+  .filters label { display:block; font-weight:600; color:#374151; margin-bottom:6px; }
   .filters input[type="text"], .filters input[type="date"], .filters select { 
     width:100%; height:40px; padding:8px 12px; border:1px solid #d1d5db; border-radius:10px; background:#fff; color:#111827;
   }
