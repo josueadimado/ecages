@@ -23,11 +23,11 @@
       <input type="text" name="q" value="{{ q|default:'' }}" placeholder="Réf./Facture…" />
       <select name="status">
         <option value="">Statut (tous)</option>
-        <option value="draft" {% if status=='draft' %}selected{% endif %}>Draft</option>
-        <option value="sent" {% if status=='sent' %}selected{% endif %}>Envoyée</option>
-        <option value="partially_validated" {% if status=='partially_validated' %}selected{% endif %}>Partielle</option>
-        <option value="validated" {% if status=='validated' %}selected{% endif %}>Validée</option>
-        <option value="cancelled" {% if status=='cancelled' %}selected{% endif %}>Annulée</option>
+        <option value="draft" {% if status == 'draft' %}selected{% endif %}>Draft</option>
+        <option value="sent" {% if status == 'sent' %}selected{% endif %}>Envoyée</option>
+        <option value="partially_validated" {% if status == 'partially_validated' %}selected{% endif %}>Partielle</option>
+        <option value="validated" {% if status == 'validated' %}selected{% endif %}>Validée</option>
+        <option value="cancelled" {% if status == 'cancelled' %}selected{% endif %}>Annulée</option>
       </select>
       <select name="provider">
         <option value="0">Fournisseur (tous)</option>
