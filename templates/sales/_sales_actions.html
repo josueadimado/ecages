@@ -1,0 +1,170 @@
+{# Reusable sales actions: modals and JS used by salesperson and manager #}
+<form style="display:none">{% csrf_token %}</form>
+
+{# --- Modals: Pieces, Moto, Cancellation --- #}
+{% comment %} Extracted lightweight versions of modals and scripts from sales/dashboard.html {% endcomment %}
+
+<div id="modalPiece" class="modal" aria-hidden="true">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="hd">
+      <div class="title">Nouvelle Vente de Pièce(s)</div>
+      <button class="btn" data-close="#modalPiece">Fermer ✕</button>
+    </div>
+    <div class="bd">
+      <div class="grid g-4">
+        <div class="field"><label>Vente №</label><input id="p-num" readonly></div>
+        <div class="field"><label>Vendeur</label><input value="{{ request.user.get_full_name|default:request.user.username }}" readonly></div>
+        <div class="field"><label>Date</label><input id="p-date" readonly></div>
+        <div class="field"><label>Paiement</label><select id="p-pay"><option value="cash">Espèce</option><option value="mobile">Mobile Money</option><option value="card">Carte</option></select></div>
+        <div class="field"><label>Rechercher un nom (historique)</label><input id="p-client-q" placeholder="Tapez pour suggérer…"></div>
+        <div class="field"><label>Nom du Client</label><input id="p-client" placeholder="Nom"></div>
+        <div class="field"><label>Contact</label><input id="p-phone" placeholder="Téléphone"></div>
+        <div class="field"></div>
+      </div>
+      <div class="picker" style="margin-top:10px;">
+        <div class="head"><div class="row"><strong>Articles</strong><span class="muted" style="font-size:.85rem;">Cliquez un produit pour l’ajouter</span></div><input id="p-search" placeholder="Rechercher un produit (nom, marque)…"></div>
+        <div id="p-list" class="list"></div>
+      </div>
+      <div style="margin-top:10px;">
+        <div class="editable-hint"><span class="dot"></span><span>Le <strong>prix</strong> est modifiable si nécessaire.</span></div>
+        <table class="table"><thead><tr><th>Produit</th><th>Qté</th><th>Min</th><th class="price">Prix</th><th>Total</th><th>—</th></tr></thead><tbody id="p-lines"></tbody></table>
+      </div>
+      <div class="row" style="justify-content:flex-end;margin-top:10px;">
+        <div class="title">Total : <span id="p-grand" style="color:var(--brand)">FCFA 0</span></div>
+      </div>
+      <div class="row" style="justify-content:flex-end;margin-top:12px;">
+        <button class="btn" data-close="#modalPiece">Annuler</button>
+        <button id="p-submit" class="btn btn-brand">Vendre</button>
+      </div>
+    </div>
+  </div>
+  </div>
+
+<div id="modalMoto" class="modal" aria-hidden="true">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="hd">
+      <div class="title">Nouvelle Vente de Moto</div>
+      <button class="btn" data-close="#modalMoto">Fermer ✕</button>
+    </div>
+    <div class="bd">
+      <div class="grid g-4">
+        <div class="field"><label>Vente №</label><input id="m-num" readonly></div>
+        <div class="field"><label>Vendeur</label><input value="{{ request.user.get_full_name|default:request.user.username }}" readonly></div>
+        <div class="field"><label>Date</label><input id="m-date" readonly></div>
+        <div class="field"><label>Mode de Paiement</label>
+          <select id="m-pay"><option value="cash">Espèce</option><option value="mobile">Mobile Money</option><option value="card">Carte</option></select>
+        </div>
+      </div>
+      <div class="grid g-4" style="margin-top:10px;">
+        <div class="field"><label>Rechercher un client (historique)</label><input id="m-client-q" placeholder="Tapez pour suggérer…"></div>
+        <div class="field"><label>Nom (Surname)</label><input id="m-lastname" placeholder="Nom"></div>
+        <div class="field"><label>Prénom (Name)</label><input id="m-firstname" placeholder="Prénom"></div>
+        <div class="field"><label>Téléphone Mobile</label><input id="m-mobile" placeholder="Ex: 07 00 00 00"></div>
+        <div class="field"><label>Téléphone (Société)</label><input id="m-companyphone" placeholder="Si acheté par une société"></div>
+        <div class="field"><label>Téléphone Domicile</label><input id="m-homephone" placeholder="Fixe / Domicile"></div>
+        <div class="field"><label>Profession</label><input id="m-job" placeholder="Profession"></div>
+        <div class="field"><label>Adresse</label><input id="m-address" placeholder="Adresse complète"></div>
+        <div class="field"><label>Demeurant à</label><input id="m-resides" placeholder="Quartier / Ville"></div>
+      </div>
+      <div class="picker" style="margin-top:10px;"><div class="head"><strong>Moto</strong><input id="m-search" placeholder="Rechercher…"></div><div id="m-list" class="list"></div></div>
+      <div id="m-selected-wrap" class="row hidden" style="margin-top:8px;align-items:center;gap:.6rem;"><span class="price-badge" id="m-selected-label">—</span></div>
+      <div class="editable-hint"><span class="dot"></span><span>Le <strong>prix</strong> est modifiable mais <strong>jamais inférieur</strong> au minimum affiché.</span></div>
+      <div class="grid g-4" style="margin-top:10px;">
+        <div class="field"><label>Qté</label><input id="m-qty" type="number" value="1" min="1"></div>
+        <div class="field"><label>Min</label><input id="m-min" readonly></div>
+        <div class="field"><label>Prix</label><input id="m-price" type="number" class="price-input"></div>
+        <div class="field"><label>&nbsp;</label><div id="m-stock" class="muted" style="padding:.55rem .2rem">&nbsp;</div></div>
+        <div class="field"><label>N° de Châssis</label><input id="m-chassis" placeholder="Numéro de châssis"></div>
+        <div class="field"><label>N° Moteur</label><input id="m-engine" placeholder="Numéro moteur"></div>
+        <div class="field"><label>Montant en lettres</label><input id="m-amount-words" placeholder="Ex: Un million de FCFA"></div>
+        <div class="field"><label>&nbsp;</label><div class="muted" style="padding:.55rem .2rem">Complétez les champs ci‑dessus</div></div>
+      </div>
+      <div class="row" style="justify-content:flex-end;margin-top:10px;"><div class="title">Total : <span id="m-grand" style="color:var(--brand)">FCFA 0</span></div></div>
+      <div class="row" style="justify-content:flex-end;margin-top:12px;"><button class="btn" data-close="#modalMoto">Annuler</button><button id="m-submit" class="btn btn-dark">Vendre</button></div>
+    </div>
+  </div>
+</div>
+
+<div id="modalCancel" class="modal" aria-hidden="true">
+  <div class="sheet" role="dialog" aria-modal="true" style="width:min(760px,95vw)">
+    <div class="hd"><div class="title" style="color:var(--bad)">Annulation de vente</div><button class="btn" data-close="#modalCancel">Fermer ✕</button></div>
+    <div class="bd">
+      <div class="grid" style="gap:.6rem">
+        <div class="field">
+          <label>Numéro de reçu</label>
+          <div class="row" style="gap:.5rem; align-items:center"><input id="c-number" placeholder="Ex: YO-210825-P-0007" style="flex:1; min-width:260px"><button id="c-search" class="btn">Rechercher</button></div>
+        </div>
+        <div id="c-result" class="hidden">
+          <div id="c-meta" class="meta" style="margin:.25rem 0 .5rem 0;"></div>
+          <div class="divider"></div>
+          <div class="row" style="align-items:center; gap:.6rem; margin:.3rem 0;"><label class="row" style="gap:.4rem; align-items:center"><input type="checkbox" id="c-all"> Tout sélectionner</label></div>
+          <div id="c-lines" class="picker" style="padding:.4rem .6rem"></div>
+          <div class="field"><label>Motif (obligatoire)</label><textarea id="c-reason" rows="3" placeholder="Expliquez brièvement…" style="width:100%;border:1px solid var(--ring);border-radius:10px;padding:.55rem .75rem;"></textarea></div>
+          <div class="actions-bar"><button id="c-now" class="btn btn-red hidden">Annuler maintenant</button><button id="c-request" class="btn hidden">Soumettre la demande</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="loader" id="pageLoader"><div class="spinner"></div></div>
+<div class="toasts" id="toasts" aria-live="polite" role="status"></div>
+
+<script>
+(function(){
+  const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
+  function getCSRF(){ const m=document.cookie.match('(^|;)\\s*csrftoken\\s*=\\s*([^;]+)'); if(m) return m.pop(); const el=document.querySelector('input[name="csrfmiddlewaretoken"]'); return el?el.value:''; }
+  const CSRF=getCSRF();
+  const toast=(msg,kind='info')=>{ const d=document.createElement('div'); d.className='toast '+(kind==='good'?'good':kind==='bad'?'bad':''); d.textContent=msg; $('#toasts').appendChild(d); setTimeout(()=>d.remove(),3500); };
+  const pageLoader=$('#pageLoader'), showLoader=()=>pageLoader.classList.add('show'), hideLoader=()=>pageLoader.classList.remove('show');
+  const f=n=>Number(n||0).toLocaleString('fr-FR'); const pad=n=>n<10?'0'+n:n; const nowStr=()=>{ const d=new Date(); return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+
+  // Close helpers
+  document.addEventListener('click',(e)=>{ const t=e.target.closest('[data-close]'); if(!t) return; const sel=t.getAttribute('data-close'); const m=document.querySelector(sel); if(m) m.classList.remove('show'); });
+  document.addEventListener('keydown',(e)=>{ if(e.key==='Escape'){ const open=document.querySelector('.modal.show'); if(open){ open.classList.remove('show'); } }});
+  function openModal(id){ const m=$(id); if(!m) return; m.classList.add('show'); }
+
+  // Piece sale subset
+  const pList=$('#p-list'), pSearch=$('#p-search'), pLines=$('#p-lines'); let pieceCache=null;
+  async function fetchJSON(url){ const r=await fetch(url); if(!r.ok) throw new Error('HTTP '+r.status); return await r.json(); }
+  async function ensurePieces(){ if(pieceCache) return pieceCache; const api=await fetchJSON('/sales/api/products/?type=piece'); pieceCache=(api||[]).map(x=>({product_id:Number(x.product_id||x.id||0), name:x.name||'', brand:x.brand||'', price:Number(x.price||x.retail_price||0), available:Number(x.available||0)})); return pieceCache; }
+  function renderPieceResults(items){ pList.innerHTML=''; if(!items.length){ pList.classList.add('hidden'); return; } items.forEach(d=>{ const row=document.createElement('div'); row.className='item'; row.innerHTML=`<div class="name">${d.name}${d.brand?` <span class='dim'>— ${d.brand}</span>`:''}</div><div class="dim">Min: <span class='price-badge'>FCFA ${f(d.price)}</span></div><div class="dim">Stock: ${d.available}</div><div class="dim"><button class='btn'>Ajouter</button></div>`; const add=()=>addPieceLine(d); row.addEventListener('click',e=>{ if(e.target.tagName!=='BUTTON') add(); }); row.querySelector('button').addEventListener('click',e=>{ e.stopPropagation(); add(); }); pList.appendChild(row); }); pList.classList.remove('hidden'); }
+  const debounce=(fn,ms)=>{ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; };
+  const filterPieces=debounce(async()=>{ const txt=(pSearch.value||'').toLowerCase(); if(!txt){ pList.innerHTML=''; pList.classList.add('hidden'); return; } try{ const data=await ensurePieces(); const found=data.filter(d=>(d.name+' '+(d.brand||'')).toLowerCase().includes(txt)); renderPieceResults(found.slice(0,160)); }catch{ toast('Recherche indisponible.','bad'); } },180);
+  pSearch?.addEventListener('input',filterPieces);
+  function updatePiecesGrand(){ let sum=0; pLines.querySelectorAll('.line .total').forEach(td=>{ const n=Number((td.textContent||'0').replace(/\s/g,'')); sum+=n; }); $('#p-grand').textContent=`FCFA ${f(sum)}`; }
+  function addPieceLine(d){ if(Number(d.available)<=0){ toast('Stock indisponible.','bad'); return; } const tr=document.createElement('tr'); tr.className='line'; tr.dataset.pid=d.product_id; tr.innerHTML=`<td><strong>${d.name}</strong> ${d.brand?`<span class='muted'>— ${d.brand}</span>`:''}</td><td><input type='number' class='qty' min='1' value='1' style='width:90px'></td><td><input class='minv' readonly value='${Math.round(Number(d.price||0))}' style='width:100px'></td><td><input type='number' class='unit price-input' value='${Math.round(Number(d.price||0))}' style='width:140px'></td><td class='total'>0</td><td><button class='btn'>Suppr.</button></td>`; pLines.appendChild(tr); const qty=tr.querySelector('.qty'), unit=tr.querySelector('.unit'), minv=tr.querySelector('.minv'), total=tr.querySelector('.total'); qty.max=String(d.available||999999); function recalc(){ let q=Math.max(1,Math.round(Number(qty.value||1))); const av=Number(d.available||0); if(q>av){ q=av; qty.value=av; toast('Qté > stock.','bad'); } let p=Math.round(Number(unit.value||0)); const mn=Math.round(Number(minv.value||0)); if(p<mn){ p=mn; unit.value=mn; toast('Prix < minimum.','bad'); } total.textContent=f(q*p); updatePiecesGrand(); } qty.addEventListener('input',recalc); unit.addEventListener('input',recalc); tr.querySelector('.btn').addEventListener('click',()=>{ tr.remove(); updatePiecesGrand(); }); recalc(); pList.innerHTML=''; pList.classList.add('hidden'); pSearch.value=''; unit.focus(); unit.select(); }
+  async function openPieces(){ $('#p-date').value=nowStr(); try{ const inv=await fetchJSON('/sales/api/invoice-number/?kind=P'); $('#p-num').value=inv.number; }catch{ $('#p-num').value='—'; } pList.innerHTML=''; pSearch.value=''; pLines.innerHTML=''; $('#p-grand').textContent='FCFA 0'; openModal('#modalPiece'); }
+  $('#p-submit')?.addEventListener('click', async ()=>{ const items=[]; document.querySelectorAll('#p-lines .line').forEach(tr=>{ const pid=Number(tr.dataset.pid||0); const q=Math.round(Number(tr.querySelector('.qty').value||0)); const p=Math.round(Number(tr.querySelector('.unit').value||0)); const mn=Math.round(Number(tr.querySelector('.minv').value||0)); if(pid && q>0 && p>=mn) items.push({product_id:pid, qty:q, unit_price:p}); }); if(!items.length){ toast('Ajoutez au moins un article.','bad'); return; } const payload={ kind:'P', customer_name:($('#p-client').value||'DIVERS'), customer_phone:($('#p-phone').value||''), payment_type:($('#p-pay').value||'cash'), items }; try{ showLoader(); const r=await fetch('/sales/api/create-sale-draft/',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':CSRF}, body:JSON.stringify(payload)}); const res=await r.json(); hideLoader(); if(res.ok){ toast(`Vente enregistrée (${res.number}).`,'good'); document.querySelector('[data-close="#modalPiece"]').click(); } else { toast(res.error||'Erreur.','bad'); } }catch{ hideLoader(); toast('Erreur réseau.','bad'); } });
+
+  // Moto subset (search and submit)
+  const mList=$('#m-list'), mSearch=$('#m-search'); let motoCache=null;
+  const ensureMotos=async()=>{ if(motoCache) return motoCache; motoCache=await fetchJSON('/sales/api/products/?type=moto'); return motoCache; };
+  const filterMotos=debounce(async()=>{ const txt=(mSearch.value||'').toLowerCase(); if(!txt){ mList.innerHTML=''; return; } const data=await ensureMotos(); const found=data.filter(d=>(d.name+' '+(d.brand||'')).toLowerCase().includes(txt)); mList.innerHTML=''; found.slice(0,120).forEach(d=>{ const row=document.createElement('div'); row.className='item'; row.innerHTML=`<div class='name'>${d.name}${d.brand?` <span class='dim'>— ${d.brand}</span>`:''}</div><div class='dim'>Min: <span class='price-badge'>FCFA ${f(d.price)}</span></div><div class='dim'>Stock: ${d.available}</div><div class='dim'><button class='btn'>Choisir</button></div>`; const choose=()=>selectMoto(d); row.addEventListener('click',choose); row.querySelector('button').addEventListener('click',(e)=>{ e.stopPropagation(); choose(); }); mList.appendChild(row); }); },180);
+  mSearch?.addEventListener('input',filterMotos);
+  function selectMoto(d){ $('#m-qty').value=1; $('#m-min').value=Math.round(Number(d.price||0)); $('#m-price').value=Math.round(Number(d.price||0)); $('#m-qty').max=String(d.available||999999); $('#m-qty').dataset.avail=String(d.available||0); $('#m-stock').textContent=d.available?`Disponible: ${d.available}`:''; $('#m-grand').textContent=`FCFA ${f(Number($('#m-price').value||0))}`; mList.innerHTML=''; const selLbl=document.getElementById('m-selected-label'); const selWrap=document.getElementById('m-selected-wrap'); if(selLbl) selLbl.textContent=`Moto : ${d.name}${d.brand? ' — '+d.brand : ''}`; if(selWrap) selWrap.classList.remove('hidden'); mList.dataset.pid=d.product_id; }
+  document.getElementById('m-qty')?.addEventListener('input',()=>{ const qtyEl=$('#m-qty'); const priceEl=$('#m-price'); const minEl=$('#m-min'); const grandEl=$('#m-grand'); let q=Math.max(1,Math.round(Number(qtyEl.value||1))); const avail=Number(qtyEl.dataset.avail||0); if(avail && q>avail){ q=avail; qtyEl.value=String(avail); toast('La quantité demandée dépasse le stock disponible.','bad'); } let p=Math.round(Number(priceEl.value||0)); const mn=Math.round(Number(minEl.value||0)); if(mn && p<mn){ p=mn; priceEl.value=String(mn); toast('Le prix ne peut pas être inférieur au minimum.','bad'); } grandEl.textContent=`FCFA ${f(q*p)}`; });
+  document.getElementById('m-price')?.addEventListener('input',()=>{ const qtyEl=$('#m-qty'); const priceEl=$('#m-price'); const minEl=$('#m-min'); const grandEl=$('#m-grand'); let q=Math.max(1,Math.round(Number(qtyEl.value||1))); let p=Math.round(Number(priceEl.value||0)); const mn=Math.round(Number(minEl.value||0)); if(mn && p<mn){ p=mn; priceEl.value=String(mn); toast('Le prix ne peut pas être inférieur au minimum.','bad'); } grandEl.textContent=`FCFA ${f(q*p)}`; });
+  document.getElementById('m-submit')?.addEventListener('click', async ()=>{
+    const pid=Number(mList?.dataset.pid||0); if(!pid){ toast('Veuillez choisir la moto.','bad'); return; }
+    const qty=Math.round(Number($('#m-qty').value||0)); const minv=Math.round(Number($('#m-min').value||0)); const price=Math.round(Number($('#m-price').value||0)); if(qty<=0){ toast('Quantité invalide.','bad'); return; } if(price<minv){ toast('Prix invalide.','bad'); return; }
+    const lastname=($('#m-lastname').value||'').trim(); const firstname=($('#m-firstname').value||'').trim(); const mobile=($('#m-mobile').value||'').trim(); const companyPhone=($('#m-companyphone').value||'').trim(); const homePhone=($('#m-homephone').value||'').trim(); const job=($('#m-job').value||'').trim(); const address=($('#m-address').value||'').trim(); const resides=($('#m-resides').value||'').trim(); const chassis=($('#m-chassis').value||'').trim(); const engine=($('#m-engine').value||'').trim(); const amountWords=($('#m-amount-words').value||'').trim();
+    const fullName=(lastname||firstname)? `${lastname}${lastname&&firstname?' ':''}${firstname}` : 'DIVERS';
+    const payload={ kind:'M', customer_name: fullName, customer_phone: mobile||companyPhone||homePhone||'', payment_type:($('#m-pay').value||'cash'), items:[{product_id:pid, qty:qty, unit_price:price}], customer_details:{ surname: lastname, name: firstname, mobile_phone: mobile, company_phone: companyPhone, home_phone: homePhone, profession: job, address: address, resides_at: resides, chassis_number: chassis, engine_number: engine, amount_in_words: amountWords } };
+    try{ showLoader(); const r=await fetch('/sales/api/create-sale-draft/',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':CSRF}, body:JSON.stringify(payload)}); const res=await r.json(); hideLoader(); if(res.ok){ toast(`Vente enregistrée (${res.number}).`,'good'); document.querySelector('[data-close="#modalMoto"]').click(); } else { toast(res.error||'Erreur.','bad'); } }catch{ hideLoader(); toast('Erreur réseau.','bad'); }
+  });
+
+  // Cancellation subset
+  function resetCancelUI(){ $('#c-result')?.classList.add('hidden'); const meta=$('#c-meta'); if(meta) meta.textContent=''; const lines=$('#c-lines'); if(lines) lines.innerHTML=''; const all=$('#c-all'); if(all) all.checked=false; const reason=$('#c-reason'); if(reason) reason.value=''; }
+  async function findByNumber(){ const num=($('#c-number')?.value||'').trim(); if(!num){ toast('Saisissez un numéro de reçu.','bad'); return; } try{ showLoader(); const r=await fetch(`/sales/api/find-sale-by-number/?q=${encodeURIComponent(num)}`); const res=await r.json(); hideLoader(); if(!res.ok){ toast(res.error||'Reçu introuvable.','bad'); resetCancelUI(); return; } const meta=$('#c-meta'); if(meta){ const dayPill=res.is_today? '<span class="pill">Vente du jour</span>':'<span class="pill bad">Vente antérieure</span>'; meta.innerHTML=`<span class="pill">Reçu&nbsp;${res.number}</span>${dayPill}`; } const body=(res.items||[]).map(it=>`<tr><td style="width:28px;"><input type="checkbox" class="c-line-check" data-sid="${String(it.id)}" data-qty="${String(it.qty)}"></td><td><strong>${it.product}</strong></td><td class="muted">Qté: ${it.qty}</td><td class="muted">Total: FCFA ${f(it.line_total)}</td></tr>`).join(''); $('#c-lines').innerHTML=`<table class="table-lite"><thead><tr><th></th><th>Produit</th><th>Qté</th><th>Total</th></tr></thead><tbody>${body}</tbody></table>`; $('#c-result').classList.remove('hidden'); $('#c-now').classList.toggle('hidden', !res.is_today); $('#c-request').classList.toggle('hidden', !!res.is_today); }catch{ hideLoader(); toast('Erreur réseau.','bad'); } }
+  $('#c-search')?.addEventListener('click', (e)=>{ e.preventDefault(); findByNumber(); });
+  $('#c-all')?.addEventListener('change', ()=>{ const checked=$('#c-all').checked; document.querySelectorAll('.c-line-check').forEach(cb=>{ cb.checked=checked; }); });
+  function getSelectedMap(){ const map={}; document.querySelectorAll('.c-line-check:checked').forEach(cb=>{ const sid=Number(cb.dataset.sid||0); const q=Number(cb.dataset.qty||0); if(sid&&q){ map[sid]=q; } }); return map; }
+  $('#c-now')?.addEventListener('click', async ()=>{ const sel=getSelectedMap(); if(Object.keys(sel).length===0){ toast('Sélectionnez au moins un article.','bad'); return; } const reason=($('#c-reason')?.value||'').trim(); if(!reason){ toast('Veuillez saisir un motif.','bad'); return; } try{ showLoader(); const r=await fetch('/sales/api/cancel-sale-immediate/',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':CSRF}, body:JSON.stringify({ sale_id: window.__lastSaleId||0, item_quantities: sel, reason })}); const res=await r.json(); hideLoader(); if(res.ok){ toast('Annulation effectuée.','good'); document.querySelector('[data-close="#modalCancel"]').click(); } else { toast(res.error||"Échec de l'annulation.", 'bad'); } }catch{ hideLoader(); toast('Erreur réseau.','bad'); } });
+  $('#c-request')?.addEventListener('click', async ()=>{ const sel=getSelectedMap(); if(Object.keys(sel).length===0){ toast('Sélectionnez au moins un article.','bad'); return; } const reason=($('#c-reason')?.value||'').trim(); if(!reason){ toast('Veuillez saisir un motif.','bad'); return; } try{ showLoader(); const r=await fetch('/sales/api/cancel-sale-request/',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':CSRF}, body:JSON.stringify({ sale_id: window.__lastSaleId||0, item_quantities: sel, reason })}); const res=await r.json(); hideLoader(); if(res.ok){ toast('Demande envoyée pour validation.','good'); document.querySelector('[data-close="#modalCancel"]').click(); } else { toast(res.error||'Échec de la demande.','bad'); } }catch{ hideLoader(); toast('Erreur réseau.','bad'); } });
+
+  // Expose openers for manager buttons
+  window.__salesOpen = { openPieces, openMoto: ()=>{ $('#m-date').value=nowStr(); (async()=>{ try{ const inv=await fetchJSON('/sales/api/invoice-number/?kind=M'); $('#m-num').value=inv.number; }catch{ $('#m-num').value='—'; } })(); document.getElementById('m-selected-wrap')?.classList.add('hidden'); document.getElementById('m-selected-label').textContent='—'; openModal('#modalMoto'); }, openCancel: ()=>{ resetCancelUI(); openModal('#modalCancel'); } };
+})();
+</script>
+

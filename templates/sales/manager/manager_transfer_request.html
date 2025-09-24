@@ -1,0 +1,121 @@
+{% extends "layouts/base_sales.html" %}
+{% block title %}Demande de transfert | ECAGES{% endblock %}
+{% block extra_css %}
+  <style>
+    :root{ --ring:#e5e7eb; --muted:#64748b; }
+    .page{ padding:16px; }
+    .ribbon{ background:linear-gradient(180deg,#6e0a0a,var(--brand)); color:#fff; border-radius:18px; padding:18px 24px; font-weight:900; margin-bottom:12px; overflow:hidden; }
+    .marquee{ position:relative; width:100%; overflow:hidden; }
+    .marquee span{ display:inline-block; padding-left:100%; white-space:nowrap; animation: scrollLeft 18s linear infinite; font-size:1.35rem; }
+    @keyframes scrollLeft { 0%{transform:translateX(0)} 100%{transform:translateX(-100%)} }
+    .card{ background:#fff; border:1px solid var(--ring); border-radius:12px; box-shadow:0 8px 24px rgba(2,8,23,.06); }
+    .row{ display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; }
+    .grid{ display:grid; gap:10px; }
+    .g-2{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+    @media (max-width:900px){ .g-2{ grid-template-columns:1fr; } }
+    .field label{ display:block; font-size:.82rem; color:#64748b; margin-bottom:.25rem; }
+    .field input, .field select{ border:1px solid var(--ring); border-radius:12px; padding:.6rem .85rem; background:#fff; transition:box-shadow .15s, border-color .15s; }
+    .field input:focus, .field select:focus{ outline:none; border-color: var(--brand); box-shadow:0 0 0 4px rgba(88,7,6,.12); }
+    .select-wrap{ position:relative; }
+    .select-wrap select{ appearance:none; -webkit-appearance:none; -moz-appearance:none; padding-right:2.2rem; }
+    .select-wrap .chev{ position:absolute; right:.6rem; top:50%; transform:translateY(-50%); pointer-events:none; color:#475569; }
+    .overlay{ position:absolute; left:0; right:0; top:72px; background:#fff; border:1px solid var(--ring); border-radius:12px; box-shadow:0 10px 30px rgba(2,8,23,.12); display:none; z-index:30; }
+    .overlay .hd{ padding:8px; border-bottom:1px solid var(--ring); }
+    .overlay .hd input{ width:100%; border:1px solid var(--ring); border-radius:999px; padding:.5rem .9rem; }
+    .overlay .bd{ max-height:280px; overflow:auto; }
+    .overlay .rowi{ padding:.5rem .75rem; border-bottom:1px solid #f3f4f6; cursor:pointer; }
+    .overlay .rowi:hover{ background:#f8fafc; }
+    .table{ width:100%; border-collapse:separate; border-spacing:0; }
+    .table th{ text-align:left; font-size:.82rem; color:var(--muted); border-bottom:1px solid var(--ring); padding:.55rem .7rem; }
+    .table td{ border-bottom:1px solid #f3f4f6; padding:.55rem .7rem; }
+    .btn{ border:1px solid var(--ring); background:#fff; border-radius:10px; padding:.45rem .75rem; font-weight:800; }
+    .btn-brand{ background:var(--brand); color:#fff; border-color:transparent; }
+    .btn[disabled]{ opacity:.6; cursor:not-allowed; }
+    /* Toast */
+    .toast{ position:fixed; right:16px; bottom:16px; background:#111827; color:#fff; padding:.7rem .95rem; border-radius:10px; box-shadow:0 8px 24px rgba(2,8,23,.2); display:none; z-index:60; font-weight:800; }
+    .toast.show{ display:block; }
+    .toast.success{ background:#065f46; }
+    .toast.error{ background:#991b1b; }
+    .toast.info{ background:#1f2937; }
+    /* Modal */
+    .modal{ position:fixed; inset:0; background:rgba(2,8,23,.45); display:none; align-items:center; justify-content:center; z-index:50; }
+    .modal .dlg{ width:min(520px,92vw); background:#fff; border-radius:14px; border:1px solid var(--ring); box-shadow:0 10px 30px rgba(2,8,23,.2); }
+    .modal .dlg .hd{ padding:14px 16px; border-bottom:1px solid var(--ring); font-weight:900; }
+    .modal .dlg .bd{ padding:12px 16px; }
+    .modal .dlg .ft{ padding:12px 16px; display:flex; justify-content:flex-end; gap:8px; border-top:1px solid var(--ring); }
+    /* Suggestions */
+    .sug-item{ padding:.45rem .6rem; cursor:pointer; }
+    .sug-item:hover, .sug-item.active{ background:#f1f5f9; }
+  </style>
+{% endblock %}
+{% block content %}
+  <div class="page">
+    <div class="ribbon"><div class="marquee"><span id="ribbonText">ECAGES</span></div></div>
+
+    <div class="card" style="padding:12px 16px; margin-bottom:12px;">
+      <div class="grid g-2">
+        <div class="field"><label>Depuis</label><div class="select-wrap"><input readonly value="{{ salespoint.name|default:'—' }}"></div></div>
+        <div class="field"><label>Depuis (point de vente source)</label><div class="select-wrap"><select id="from_sp"><option value="">Sélectionner…</option>{% for o in others %}<option value="{{ o.id }}">{{ o.name }}</option>{% endfor %}</select><span class="chev">▾</span></div></div>
+        <div class="field"><label>Numéro</label><div class="select-wrap"><input id="reqNum" readonly placeholder="—"><span id="reqNumBadge" class="chev" style="position:absolute; right:.6rem; top:50%; transform:translateY(-50%); font-weight:800; color:#111827;"></span></div></div>
+        <div class="field" id="searchWrap" style="grid-column:1/-1; position:relative;">
+          <label>Rechercher un produit (stock du point de vente sélectionné)</label>
+          <div class="row" style="gap:8px;">
+            <input id="q" placeholder="Nom ou marque…" style="flex:1; min-width:280px;">
+            <button id="btnAdd" class="btn">Ajouter</button>
+            <div id="sug" style="display:none; position:absolute; left:0; right:0; top:72px; background:#fff; border:1px solid var(--ring); border-radius:10px; box-shadow:0 8px 24px rgba(2,8,23,.06); max-height:280px; overflow:auto; z-index:20;"></div>
+          </div>
+        </div>
+        <div class="row" style="gap:.5rem; justify-content:flex-end; grid-column:1/-1;">
+          <button id="btnSend" class="btn btn-brand">Envoyer la demande</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="padding:12px 16px;">
+      <table class="table">
+        <thead><tr><th>Produit</th><th>Marque</th><th>Disponible (source)</th><th>—</th></tr></thead>
+        <tbody id="lines"><tr id="emptyRow"><td colspan="4" style="text-align:center; color:#64748b; padding:14px;">Aucun article sélectionné</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <form style="display:none">{% csrf_token %}</form>
+  <div id="toast" class="toast info"></div>
+  <div id="confirmModal" class="modal"><div class="dlg"><div class="hd">Envoyer la demande</div><div class="bd" id="confirmText">Confirmez-vous l'envoi de cette demande de transfert ?</div><div class="ft"><button id="mCancel" class="btn">Annuler</button><button id="mOk" class="btn btn-brand">Confirmer</button></div></div></div>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function(){
+  const CSRF=(document.cookie.match('(^|;)\\s*csrftoken\\s*=\\s*([^;]+)')||[]).pop()||document.querySelector('input[name="csrfmiddlewaretoken"]').value||'';
+  const $=s=>document.querySelector(s); const lines=$('#lines'); let cached=[];
+
+  function renderSuggest(items){ const box=$('#sug'); box.innerHTML=''; if(!items.length){ box.style.display='none'; return; } items.forEach((it,i)=>{ const r=document.createElement('div'); r.className='sug-item'+(i===0?' active':''); r.textContent=`${it.name}${it.brand? ' — '+it.brand:''} (dispo: ${it.available})`; r.onclick=()=>{ addLine(it); box.style.display='none'; $('#q').value=''; }; box.appendChild(r); }); box.style.display='block'; }
+  async function search(){ const sp=$('#from_sp').value; const q=($('#q').value||'').trim(); if(!sp||!q){ renderSuggest([]); return; } const r=await fetch(`/sales/api/manager/source-stocks/?sp=${encodeURIComponent(sp)}&q=${encodeURIComponent(q)}`); const data=await r.json(); renderSuggest((data||[]).filter(it=>!cached.find(x=>x.product_id===it.product_id))); }
+  $('#q').addEventListener('input', ()=>{ clearTimeout(window.__t); window.__t=setTimeout(search, 180); });
+  $('#btnAdd').addEventListener('click', (e)=>{ e.preventDefault(); const first=$('#sug .sug-item'); if(first){ first.click(); } });
+  // Keyboard navigation for suggestions
+  $('#q').addEventListener('keydown',(e)=>{ const box=$('#sug'); if(box.style.display==='none') return; const items=[...box.querySelectorAll('.sug-item')]; if(!items.length) return; const idx=items.findIndex(x=>x.classList.contains('active')); if(e.key==='ArrowDown'){ e.preventDefault(); const next=idx<items.length-1? idx+1 : 0; items.forEach(x=>x.classList.remove('active')); items[next].classList.add('active'); items[next].scrollIntoView({block:'nearest'}); } else if(e.key==='ArrowUp'){ e.preventDefault(); const prev=idx>0? idx-1 : items.length-1; items.forEach(x=>x.classList.remove('active')); items[prev].classList.add('active'); items[prev].scrollIntoView({block:'nearest'}); } else if(e.key==='Enter'){ e.preventDefault(); const cur=items[idx>=0?idx:0]; if(cur) cur.click(); } });
+
+  // Basic select; no searchable overlay per request
+  const spSel=$('#from_sp');
+  async function allocateNumber(){ const fromId=spSel.value; if(!fromId){ $('#reqNum').value=''; $('#reqNumBadge').textContent=''; return; } try{ const r=await fetch('/sales/api/manager/transfer-request/allocate-number/', { method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':CSRF}, body: JSON.stringify({to_sp:Number(fromId)})}); const res=await r.json(); if(r.ok && res.ok){ const num=res.number||''; $('#reqNum').value=num; $('#reqNumBadge').textContent=num? '✓' : ''; } }catch(e){} }
+  spSel.addEventListener('change', allocateNumber);
+  // if already selected (e.g., back nav), try allocate
+  if(spSel.value) allocateNumber();
+
+  function addLine(it){ cached.push({ product_id: it.product_id, name: it.name, brand: it.brand||'', available: it.available }); redraw(); }
+  function redraw(){ lines.innerHTML=''; if(!cached.length){ const er=document.getElementById('emptyRow'); if(er){ lines.appendChild(er); } else { const tr=document.createElement('tr'); tr.id='emptyRow'; tr.innerHTML=`<td colspan='4' style='text-align:center; color:#64748b; padding:14px;'>Aucun article sélectionné</td>`; lines.appendChild(tr); } return; } cached.forEach((it)=>{ const tr=document.createElement('tr'); tr.dataset.pid=String(it.product_id); tr.innerHTML=`<td><strong>${it.name}</strong></td><td>${it.brand}</td><td>${it.available}</td><td><button class='btn btn-del'>Suppr.</button></td>`; lines.appendChild(tr); }); }
+  lines.addEventListener('click', (e)=>{ const b=e.target.closest('.btn-del'); if(!b) return; const tr=b.closest('tr'); const pid=Number(tr.dataset.pid||0); cached=cached.filter(x=>x.product_id!==pid); redraw(); });
+
+  function showToast(msg, kind='info'){ const t=$('#toast'); t.className='toast '+kind; t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 2200); }
+  function confirmSend(){ const m=$('#confirmModal'); const sel=$('#from_sp'); const name=sel.options[sel.selectedIndex]?.textContent||''; const msg=name?`Confirmez-vous l'envoi de cette demande de transfert au point de vente ${name} (source) ?`:`Confirmez-vous l'envoi de cette demande de transfert ?`; $('#confirmText').textContent=msg; m.style.display='flex'; const onCancel=()=>{ m.style.display='none'; c.removeEventListener('click', onCancel); o.removeEventListener('click', onOk); }; const onOk=()=>{ m.style.display='none'; saveOrSend('send'); }; const c=$('#mCancel'), o=$('#mOk'); c.addEventListener('click', onCancel, {once:true}); o.addEventListener('click', onOk, {once:true}); }
+  async function saveOrSend(action){ const fromId=$('#from_sp').value; if(!fromId){ showToast('Choisissez le point de vente source.','error'); return; } if(!cached.length){ showToast('Ajoutez au moins un article.','error'); return; } const payload={ from_sp: Number(fromId), lines: cached.map(x=>({product_id:x.product_id})), action }; const r=await fetch('/sales/api/manager/transfer-request/save/', { method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':CSRF}, body: JSON.stringify(payload) }); let res={ok:false}; try{ res=await r.json(); }catch(e){} if(r.ok && res.ok){ const msg=action==='send'?(res.number?`Demande envoyée • ${res.number}`:'Demande envoyée.'):'Brouillon enregistré.'; showToast(msg,'success'); if(action==='send') setTimeout(()=>location.href='{% url "sales:manager_dashboard" %}', 900); } else { showToast(res.error||'Erreur réseau. Réessayez.','error'); } }
+  $('#btnSend').addEventListener('click', ()=>confirmSend());
+
+  // Marquee clock
+  (function(){ const el=document.getElementById('ribbonText'); if(!el) return; function pad(n){return n<10?'0'+n:n;} function cap(s){return s? s.charAt(0).toUpperCase()+s.slice(1):s;} function tick(){ const d=new Date(); const dateStr=cap(d.toLocaleDateString('fr-FR',{weekday:'long',year:'numeric',month:'long',day:'numeric'})); const timeStr=`${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; el.textContent=`ECAGES • {{ salespoint.name|default:"—" }} • ${dateStr} — ${timeStr}`; } tick(); setInterval(tick,1000); })();
+})();
+</script>
+{% endblock %}
+
+

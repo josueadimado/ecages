@@ -1,0 +1,60 @@
+{% extends "layouts/base_sales.html" %}
+{% block title %}Mes brouillons — Transferts | ECAGES{% endblock %}
+{% block extra_css %}
+  <style>
+    :root{ --ring:#e5e7eb; --muted:#64748b; }
+    .page{ padding:16px; }
+    .ribbon{ background:linear-gradient(180deg,#6e0a0a,var(--brand)); color:#fff; border-radius:18px; padding:18px 24px; font-weight:900; margin-bottom:12px; overflow:hidden; }
+    .marquee{ position:relative; width:100%; overflow:hidden; }
+    .marquee span{ display:inline-block; padding-left:100%; white-space:nowrap; animation: scrollLeft 18s linear infinite; font-size:1.35rem; }
+    @keyframes scrollLeft { 0%{transform:translateX(0)} 100%{transform:translateX(-100%)} }
+    .card{ background:#fff; border:1px solid var(--ring); border-radius:12px; box-shadow:0 8px 24px rgba(2,8,23,.06); }
+    table.table{width:100%; border-collapse:separate; border-spacing:0; font-size:.98rem; min-width:840px;}
+    table.table th{position:sticky; top:0; background:#fafafa; text-align:left; font-size:.85rem; color:var(--muted); border-bottom:1px solid var(--ring); padding:.7rem .9rem; font-weight:900;}
+    table.table td{border-bottom:1px solid #f2f4f7; padding:.75rem .9rem;}
+    .btn{ border:1px solid var(--ring); background:#fff; border-radius:10px; padding:.45rem .75rem; font-weight:800; }
+    .btn-brand{ background:var(--brand); color:#fff; border-color:transparent; }
+  </style>
+{% endblock %}
+{% block content %}
+<div class="page">
+  <div class="ribbon"><div class="marquee"><span id="ribbonText">ECAGES</span></div></div>
+  <div class="card" style="overflow:auto;">
+    <table class="table">
+      <thead><tr><th>#</th><th>Vers</th><th>Créé</th><th>Articles</th><th class="right">Action</th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>{{ r.number|default:"TR-"|add:r.id }}</td>
+          <td>{{ r.to_salespoint.name }}</td>
+          <td>{{ r.created_at|date:"d/m/Y H:i" }}</td>
+          <td>{{ r.lines.count }}</td>
+          <td class="right">
+            <a href="{% url 'sales:manager_transfer_request' %}" class="btn">Modifier</a>
+            <button class="btn btn-brand" data-send="{{ r.id }}">Envoyer</button>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" style="color:#64748b; padding:1rem .9rem; font-weight:700;">Aucun brouillon.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function(){
+  const el=document.getElementById('ribbonText'); if(el){ function pad(n){return n<10?'0'+n:n;} function cap(s){return s? s.charAt(0).toUpperCase()+s.slice(1):s;} function tick(){ const d=new Date(); const dateStr=cap(d.toLocaleDateString('fr-FR',{weekday:'long',year:'numeric',month:'long',day:'numeric'})); const timeStr=`${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; el.textContent=`ECAGES • {{ salespoint.name|default:"—" }} • ${dateStr} — ${timeStr}`; } tick(); setInterval(tick,1000); }
+  function getCSRF(){ const m=document.cookie.match('(^|;)\\s*csrftoken\\s*=\\s*([^;]+)'); if(m) return m.pop(); const el=document.querySelector('input[name="csrfmiddlewaretoken"]'); return el? el.value : ''; }
+  const CSRF=getCSRF();
+  document.querySelectorAll('[data-send]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const id=btn.getAttribute('data-send');
+      try{ const r=await fetch(`/sales/api/manager/transfer-request/${id}/send/`,{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':CSRF}}); const res=await r.json(); if(res.ok){ location.reload(); } else { alert(res.error||'Erreur'); } }catch{ alert('Erreur réseau'); }
+    })
+  });
+})();
+</script>
+{% endblock %}
+

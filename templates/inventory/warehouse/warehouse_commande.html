@@ -1,0 +1,177 @@
+{% extends "layouts/base_sales.html" %}
+{% block title %}Commande Entrepôt{% endblock %}
+{% block content %}
+<div class="page">
+  <div class="ribbon"><div class="marquee"><span id="ribbonText">ECAGES • MAGASIN (DIRECTION GENERALE) • {{ "now"|date:"d/m/Y H:i" }}</span></div></div>
+  <form style="display:none">{% csrf_token %}</form>
+  <div class="card" style="margin-bottom:12px; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+    <div style="font-weight:900; font-size:1.05rem;">Nouvelle commande de l'entrepôt</div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <label style="font-weight:800; color:#64748b;">Référence</label>
+      <input id="cmdRef" class="btn" readonly value="—" />
+      <button id="genRef" class="btn">Générer</button>
+      <a class="btn" href="{% url 'inventory:warehouse_dashboard' %}">← Retour</a>
+    </div>
+  </div>
+
+  <div class="card" style="padding:14px 16px; margin-bottom:12px;">
+    <div style="display:flex; gap:10px; align-items:center; margin-bottom:8px;">
+      <button id="openSearch" class="btn btn-brand">🔍 Rechercher des produits</button>
+      <input id="notes" class="btn" placeholder="Notes (optionnel)" style="min-width:320px;" />
+    </div>
+    <div style="border:1px dashed #e5e7eb; border-radius:10px; padding:10px; color:#64748b; font-size:.9rem;">
+      Ajoutez des produits à la commande. Cette demande sera envoyée au Directeur Commercial.
+    </div>
+  </div>
+
+  <div class="card" style="padding:0; overflow:hidden;">
+    <table class="table" style="width:100%;">
+      <thead style="background:#f8fafc;">
+        <tr>
+          <th style="padding:10px 12px;">Produit</th>
+          <th style="padding:10px 12px; width:140px;">Quantité</th>
+          <th style="padding:10px 12px; width:90px;">Action</th>
+        </tr>
+      </thead>
+      <tbody id="lines">
+        <tr id="emptyState"><td colspan="3" style="padding:20px; text-align:center; color:#9ca3af;">Aucun produit ajouté</td></tr>
+      </tbody>
+    </table>
+    <div style="display:flex; justify-content:flex-end; gap:10px; padding:12px 16px; border-top:1px solid #eee;">
+      <div id="summary" style="align-self:center; color:#64748b; font-weight:800;">0 article(s)</div>
+      <button id="submit" class="btn btn-brand" disabled>📨 Envoyer la commande</button>
+    </div>
+  </div>
+
+  <!-- simple search modal -->
+  <div id="searchModal" class="modal" style="position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.5);">
+    <div class="sheet" style="width:min(900px,95vw); max-height:85vh; background:#fff; border:1px solid var(--ring); border-radius:12px; overflow:hidden; display:flex; flex-direction:column;">
+      <div style="padding:12px 16px; border-bottom:1px solid var(--ring); display:flex; gap:8px; align-items:center;">
+        <input id="q" placeholder="Nom, marque…" style="flex:1; border:1px solid var(--ring); border-radius:8px; padding:10px 12px;" />
+        <button id="closeSearch" class="btn">✕</button>
+      </div>
+      <div id="results" style="padding:8px 0; overflow:auto;">
+        <div style="padding:24px; text-align:center; color:#9ca3af;">Tapez pour rechercher des produits</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  var csrf = (document.cookie.match('(^|;)\\s*csrftoken\\s*=\\s*([^;]+)')||[]).pop()||'';
+  var cmdRef = document.getElementById('cmdRef');
+  var genRef = document.getElementById('genRef');
+  var openSearch = document.getElementById('openSearch');
+  var submitBtn = document.getElementById('submit');
+  var lines = document.getElementById('lines');
+  var emptyState = document.getElementById('emptyState');
+  var summary = document.getElementById('summary');
+  var notes = document.getElementById('notes');
+
+  function updateSummary(){
+    var rows = lines.querySelectorAll('tr[data-pid]');
+    var total = 0;
+    rows.forEach(function(r){ total += parseInt((r.querySelector('input')||{}).value||'0',10)||0; });
+    summary.textContent = total + ' article(s)';
+    submitBtn.disabled = rows.length === 0;
+  }
+
+  genRef.addEventListener('click', function(e){
+    e.preventDefault();
+    fetch('/inventory/api/wh/cmd/ref/')
+      .then(function(r){return r.json();})
+      .then(function(d){ if(d&&d.ok){ cmdRef.value = d.ref; }});
+  });
+
+  // Search modal
+  var modal = document.getElementById('searchModal');
+  var q = document.getElementById('q');
+  var results = document.getElementById('results');
+  document.getElementById('closeSearch').onclick = function(){ modal.style.display='none'; };
+  openSearch.onclick = function(e){ e.preventDefault(); modal.style.display='flex'; setTimeout(function(){ q.focus(); }, 50); };
+  var t;
+  q.oninput = function(){
+    clearTimeout(t);
+    var val = (q.value||'').trim();
+    if(val.length < 2){ results.innerHTML = '<div style="padding:24px; text-align:center; color:#9ca3af;">Tapez au moins 2 caractères</div>'; return; }
+    t = setTimeout(function(){
+      fetch('/inventory/api/wh/stock/?type=piece&q=' + encodeURIComponent(val))
+        .then(function(r){return r.json();})
+        .then(function(d){
+          if(!d||!d.ok){ results.innerHTML = '<div style="padding:24px; text-align:center; color:#ef4444;">Erreur</div>'; return; }
+          var html = '<table class="table" style="width:100%">\n<thead><tr><th style="padding:10px 12px;">Produit</th><th style="padding:10px 12px; width:120px;">Stock</th><th style="padding:10px 12px; width:160px;">Qté</th><th style="padding:10px 12px; width:90px;">Ajouter</th></tr></thead><tbody>';
+          d.rows.forEach(function(p){
+            html += '<tr>'+
+              '<td style="padding:10px 12px;">'+p.name+' '+(p.brand?('<span style="color:#9ca3af">— '+p.brand+'</span>'):'')+'</td>'+
+              '<td style="padding:10px 12px;">'+p.available+'</td>'+
+              '<td style="padding:10px 12px;"><input type="number" min="1" max="'+(p.available||9999)+'" value="1" style="width:90px"></td>'+
+              '<td style="padding:10px 12px;"><button class="btn" data-p=">'+encodeURIComponent(JSON.stringify(p))+'\'">Ajouter</button></td>'+
+            '</tr>';
+          });
+          html += '</tbody></table>';
+          results.innerHTML = html;
+          Array.from(results.querySelectorAll('button[data-p]')).forEach(function(b){
+            b.onclick = function(){
+              var p = JSON.parse(decodeURIComponent(b.getAttribute('data-p')));
+              var tr = b.closest('tr');
+              var qty = parseInt((tr.querySelector('input')||{}).value||'1',10)||1;
+              if(qty<1){return;}
+              addLine(p, qty);
+            };
+          });
+        });
+    }, 300);
+  };
+
+  function addLine(p, qty){
+    var existing = lines.querySelector('tr[data-pid="'+p.product_id+'"]');
+    if(existing){
+      var inp = existing.querySelector('input');
+      inp.value = (parseInt(inp.value||'0',10)||0) + qty;
+      updateSummary();
+      return;
+    }
+    var tr = document.createElement('tr');
+    tr.dataset.pid = p.product_id;
+    tr.innerHTML = '<td style="padding:10px 12px; font-weight:700;">'+p.name+(p.brand?(' <span style="color:#9ca3af; font-weight:400;">— '+p.brand+'</span>'):'')+'</td>'+
+                   '<td style="padding:10px 12px;"><input type="number" min="1" value="'+qty+'" style="width:90px"></td>'+
+                   '<td style="padding:10px 12px;"><button class="btn">Suppr.</button></td>';
+    tr.querySelector('input').oninput = updateSummary;
+    tr.querySelector('button').onclick = function(){ tr.remove(); updateSummary(); };
+    lines.appendChild(tr);
+    emptyState.style.display = 'none';
+    updateSummary();
+  }
+
+  submitBtn.onclick = function(){
+    var rows = lines.querySelectorAll('tr[data-pid]');
+    var payload = { notes: (notes.value||'').trim(), lines: [] };
+    rows.forEach(function(r){
+      var pid = parseInt(r.dataset.pid,10);
+      var qty = parseInt((r.querySelector('input')||{}).value||'0',10)||0;
+      if(pid && qty>0){ payload.lines.push({product_id: pid, qty: qty}); }
+    });
+    if(payload.lines.length === 0){ return; }
+    submitBtn.disabled = true; submitBtn.textContent = 'Envoi…';
+    fetch('/inventory/api/wh/cmd/submit/', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf }, body: JSON.stringify(payload)
+    }).then(function(r){ return r.json(); }).then(function(d){
+      if(d&&d.ok){
+        alert('Commande envoyée: '+d.reference);
+        window.location.href = '{% url 'inventory:warehouse_dashboard' %}';
+      } else {
+        submitBtn.disabled = false; submitBtn.textContent = '📨 Envoyer la commande';
+        alert(d.error||'Erreur');
+      }
+    }).catch(function(){ submitBtn.disabled=false; submitBtn.textContent='📨 Envoyer la commande'; alert('Erreur réseau'); });
+  };
+});
+</script>
+{% endblock %}
+
+
+
+
+

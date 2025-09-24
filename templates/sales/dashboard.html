@@ -1,0 +1,1124 @@
+{% extends "layouts/base_sales.html" %}
+{% block content %}
+<style>
+  :root{
+    --brand:#580706; --brand-ink:#3e0404; --ink:#0f172a; --muted:#64748b; --ring:#e5e7eb; --ok:#0ea5e9; --good:#16a34a; --bad:#dc2626;
+  }
+
+  /* Layout container */
+  .content-pad{max-width:100%;margin:0 auto;padding:16px}
+  @media (max-width:1024px){ .content-pad{padding:14px} }
+  @media (max-width:640px){ .content-pad{padding:12px} }
+
+  /* Hero */
+  .hero{background:linear-gradient(135deg,var(--brand) 0%,var(--brand-ink) 100%);color:#fff;border-radius:18px;padding:1rem 1.2rem;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+  .marquee{display:flex;align-items:center;justify-content:center;text-align:center}
+  .marquee span{display:block;font-weight:800;letter-spacing:.2px;padding:.2rem 0}
+
+  /* Cards & buttons */
+  .card{background:#fff;border:1px solid var(--ring);border-radius:14px;box-shadow:0 10px 30px rgba(2,8,23,.06)}
+  .title{color:#111827;font-weight:800}
+  .muted{color:var(--muted)}
+  .row{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+  .row.header{justify-content:space-between;padding:12px 16px}
+  .row.filters{gap:12px;padding:0 16px 12px 16px}
+  .right{margin-left:auto}
+  .btn{border:1px solid var(--ring);border-radius:12px;background:#fff;padding:.6rem 1rem;font-weight:800;transition:transform .06s ease,box-shadow .15s ease;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+  .btn:active{transform:translateY(1px)}
+  .btn-brand{background:var(--brand);color:#fff;border-color:transparent}
+  .btn-brand:hover{filter:brightness(.96)}
+  .btn-dark{background:#111827;color:#fff;border-color:transparent}
+  .btn-red{background:var(--bad);color:#fff;border-color:transparent}
+  .btn[disabled]{opacity:.6;cursor:not-allowed}
+  .btn:hover{box-shadow:0 6px 16px rgba(0,0,0,.08)}
+  .btn.loading{position:relative; pointer-events:none; opacity:.8}
+  .btn.loading::after{content:''; position:absolute; right:.6rem; width:16px; height:16px; border:2px solid #e5e7eb; border-top-color: var(--brand); border-radius:50%; animation: spin 1s linear infinite}
+
+  /* Tabs & table */
+  .tabs{display:flex;gap:.5rem;background:#fff;border:1px solid var(--ring);border-radius:999px;padding:.25rem}
+  .tab{padding:.42rem .9rem;border-radius:999px;font-weight:700;color:#111827}
+  .tab.active{background:var(--brand);color:#fff}
+  .table{width:100%;border-collapse:separate;border-spacing:0;font-size:.94rem}
+  .table th{position:sticky;top:0;background:#fff;z-index:1;text-align:left;font-size:.78rem;color:var(--muted);border-bottom:1px solid var(--ring);padding:.6rem .75rem}
+  .table td{border-bottom:1px solid #f2f4f7;padding:.65rem .75rem}
+  .table tr:hover td{background:#fafafa}
+
+  /* Scroll wrapper sized to viewport for better use of space */
+  .table-wrap{max-height:min(68vh, calc(100vh - 340px)); overflow:auto; width:100%}
+  @media (max-width:1024px){ .table-wrap{max-height:min(70vh, calc(100vh - 320px))} }
+  @media (max-width:780px){ .table-wrap{max-height:min(70vh, calc(100vh - 300px))} }
+  @media (max-width:520px){ .table-wrap{max-height:min(70vh, calc(100vh - 280px))} }
+
+  .pager{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.6rem .5rem}
+  .hidden{display:none!important}
+
+  /* Modal */
+  .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.35);z-index:60}
+  .modal.show{display:flex}
+  .sheet{width:min(1100px,95vw);background:#fff;border:1px solid var(--ring);border-radius:16px;transform:translateY(12px);opacity:0;transition:transform .18s ease,opacity .18s ease}
+  .modal.show .sheet{transform:translateY(0);opacity:1}
+  .hd{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--ring)}
+  .bd{padding:12px 16px}
+  .grid{display:grid;gap:.8rem}
+  .g-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .field label{display:block;font-size:.78rem;color:var(--muted);margin-bottom:.25rem}
+  .field input,.field select{width:100%;border:1px solid var(--ring);border-radius:10px;padding:.55rem .75rem;background:#fff}
+  .field input[readonly]{background:#f8fafc}
+  .picker{border:1px solid var(--ring);border-radius:12px;padding:.6rem;background:#fff}
+  .picker .head{display:flex;align-items:center;justify-content:space-between;gap:.6rem;margin-bottom:.5rem;flex-wrap:wrap}
+  .picker input{border:1px solid var(--ring);border-radius:999px;padding:.55rem .9rem;min-width:260px;flex:1}
+  .picker .list{max-height:300px;overflow:auto;border-top:1px dashed #e8eaef;margin-top:.4rem}
+  .picker .item{display:grid;grid-template-columns:1fr 110px 90px 90px;gap:.6rem;padding:.55rem .25rem;border-bottom:1px solid #f3f4f6;cursor:pointer;transition:.15s}
+  .picker .item:hover{background:#f9fafb}
+  .picker .name{font-weight:700}
+  .picker .dim{font-size:.82rem;color:var(--muted)}
+
+  /* Pieces modal enhancements */
+  .editable-hint{font-size:.82rem;color:var(--muted);margin:6px 0 4px 0;display:flex;align-items:center;gap:.4rem}
+  .editable-hint .dot{width:8px;height:8px;border-radius:999px;background:var(--brand);display:inline-block}
+  .price-input{border:2px solid var(--brand);background:#fff;border-radius:10px;padding:.55rem .75rem}
+  .price-input:focus{outline:3px solid rgba(88,7,6,.18)}
+  .price-badge{display:inline-block;background:#fee2e2;color:#991b1b;border:1px solid #fecaca;border-radius:999px;padding:.15rem .55rem;font-weight:900;font-variant-numeric:tabular-nums}
+  .table td.total{color:var(--brand);font-weight:900}
+  #p-list.hidden{display:none}
+
+  /* Toast & Loader */
+  .toasts{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;gap:.5rem;z-index:70}
+  .toast{background:#fff;border:1px solid var(--ring);border-left:4px solid var(--ok);border-radius:10px;padding:.6rem .8rem;min-width:260px;box-shadow:0 8px 24px rgba(0,0,0,.08)}
+  .toast.good{border-left-color:var(--good)} .toast.bad{border-left-color:var(--bad)}
+  .loader{position:fixed;inset:0;background:rgba(255,255,255,.65);display:none;align-items:center;justify-content:center;z-index:80;opacity:0;transition:opacity .25s ease}
+  .loader.show{display:flex;opacity:1}
+  .spinner{width:52px;height:52px;border:4px solid #e5e7eb;border-top-color:var(--brand);border-radius:50%;animation:spin 1.1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* Responsive refinements */
+  @media (max-width:1024px){
+    .g-4{grid-template-columns:repeat(2,minmax(0,1fr))}
+  }
+  @media (max-width:780px){
+    .picker .item{grid-template-columns:1fr 88px 70px 70px}
+    .row.header{padding:12px}
+    .row.filters{padding:8px 12px}
+  }
+  @media (max-width:520px){
+    .g-4{grid-template-columns:1fr}
+    .btn{width:100%}
+    #q{width:100%}
+    .right{margin-left:0}
+  }
+
+  /* Cancellation modal polish */
+  .meta{display:flex;flex-wrap:wrap;gap:.4rem}
+  .pill{display:inline-flex;align-items:center;gap:.4rem;padding:.25rem .55rem;border:1px solid var(--ring);border-radius:999px;background:#f8fafc;font-weight:700;font-size:.82rem}
+  .pill.bad{background:#fee2e2;color:#991b1b;border-color:#fecaca}
+  .divider{height:1px;background:#f3f4f6;margin:.6rem 0}
+  .table-lite{width:100%;border-collapse:separate;border-spacing:0}
+  .table-lite th,.table-lite td{padding:.55rem .6rem;border-bottom:1px solid #f3f4f6}
+  .table-lite th{font-size:.78rem;color:var(--muted);text-align:left}
+  .table-lite tr:hover td{background:#fafafa}
+  .actions-bar{display:flex;justify-content:flex-end;gap:.5rem;margin-top:.4rem}
+</style>
+
+<div class="content-pad">
+  <!-- Ensure CSRF cookie is set for JS POST calls -->
+  <form style="display:none">{% csrf_token %}</form>
+  <!-- HERO -->
+  <div class="hero">
+    <div class="marquee">
+      <span id="marqText">ECAGES • {% if salespoint %}{{ salespoint.name }}{% else %}—{% endif %}</span>
+    </div>
+</div>
+
+  <!-- PENDING CANCELLATION REQUESTS (today) -->
+  <div class="card" style="margin-top:14px;">
+    <div class="row header" style="gap:10px;">
+      <div class="title">Demandes d’annulation en attente (aujourd’hui)</div>
+      <button id="btnRefreshPending" class="btn right" title="Actualiser la liste">Actualiser</button>
+    </div>
+    <div class="table-wrap" id="pendingWrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Reçu</th>
+            <th>Client</th>
+            <th>Total</th>
+            <th>Lignes</th>
+            <th>Demandé par</th>
+            <th>Date</th>
+            <th>Statut</th>
+          </tr>
+        </thead>
+        <tbody id="pendingBody">
+          {% if pending_cancels and pending_cancels|length > 0 %}
+            {% for req in pending_cancels %}
+            <tr>
+              <td>{{ req.sale.number }}</td>
+              <td>{{ req.sale.customer_name }}</td>
+              <td>{{ req.sale.total_amount|floatformat:0 }}</td>
+              <td>{{ req.lines.all|length }}</td>
+              <td>{{ req.requested_by.get_full_name|default:req.requested_by.username }}</td>
+              <td>{{ req.created_at|date:"d/m/Y H:i" }}</td>
+              <td>
+                {% if req.status == "pending" %}<span class="price-badge">En attente</span>
+                {% elif req.status == "approved" %}<span class="price-badge" style="background:#dcfce7;color:#166534;border-color:#bbf7d0">Approuvée</span>
+                {% else %}<span class="price-badge" style="background:#fee2e2;color:#991b1b;border-color:#fecaca">Rejetée</span>{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr><td colspan="7" class="muted">Aucune demande d’annulation en attente aujourd’hui.</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- SELL MENU -->
+  <div class="card" style="margin-top:14px;">
+    <div class="row header">
+      <div class="title" style="font-size:1.05rem;">Menu de vente</div>
+      <div class="row">
+        <button id="btnPiece" class="btn btn-brand" title="Vente de Pièces (Ctrl+P)" accesskey="p">Vente de Pièces</button>
+        <button id="btnMoto" class="btn btn-dark" title="Vente de Motos (Ctrl+M)" accesskey="m">Vente de Motos</button>
+        <button id="btnCancel" class="btn btn-red" title="Demande d’annulation (Ctrl+Alt+C)" accesskey="c">Demande d’annulation</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STOCK -->
+  <div class="card" style="margin-top:14px;">
+    <div class="row header" style="gap:10px;">
+      <div class="title">Stock du point de vente</div>
+      <div class="tabs">
+        <button class="tab active" data-target="#tblPiecesWrap">Pièces</button>
+        <button class="tab" data-target="#tblMotosWrap">Motos</button>
+      </div>
+      <button id="btnRefreshStock" class="btn right" title="Actualiser les quantités">Actualiser</button>
+    </div>
+    <div class="row filters">
+      <div class="row">
+        <span class="muted" style="font-size:.85rem;">Afficher</span>
+        <select id="pageSize" class="btn" style="padding:.35rem .55rem;">
+          <option value="25">25</option><option value="50" selected>50</option><option value="100">100</option><option value="200">200</option>
+        </select>
+        <span class="muted" style="font-size:.85rem;">entrées</span>
+      </div>
+      <div class="right row">
+        <span class="muted" style="font-size:.85rem;">Recherche:</span>
+        <input id="q" class="btn" placeholder="Nom, marque…" style="min-width:280px;" title="Rechercher (Ctrl+/)" accesskey="/" />
+      </div>
+    </div>
+
+    <!-- Pièces -->
+    <div id="tblPiecesWrap">
+      <div class="table-wrap">
+        <table id="tblPieces" class="table">
+          <thead>
+            <tr>
+              <th>Produit</th><th>Prix</th><th>Marque</th><th>Qté achetée</th><th>Qté vendue</th><th>Qté dispo.</th><th>Transf. sortant</th><th>Transf. entrant</th>
+            </tr>
+          </thead>
+          <tbody id="bodyPieces">
+            {% for r in pieces %}
+            <tr>
+              <td class="name">{{ r.name }}</td>
+              <td>{{ r.retail_price|floatformat:0 }}</td>
+              <td>{{ r.brand }}</td>
+              <td>{{ r.opening_qty }}</td>
+              <td>{{ r.sold_qty }}</td>
+              <td>{{ r.remaining_qty }}</td>
+              <td>{{ r.transfer_out }}</td>
+              <td>{{ r.transfer_in }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="8" class="muted">Aucune pièce.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div id="pagerPieces" class="pager">
+        <div class="muted" style="font-size:.85rem;">Page <span id="pPage">1</span> / <span id="pPages">1</span></div>
+        <div><button id="pPrev" class="btn">Précédent</button> <button id="pNext" class="btn">Suivant</button></div>
+      </div>
+    </div>
+
+    <!-- Motos -->
+    <div id="tblMotosWrap" class="hidden">
+      <div class="table-wrap">
+        <table id="tblMotos" class="table">
+          <thead>
+            <tr>
+              <th>Produit</th><th>Prix</th><th>Marque</th><th>Qté achetée</th><th>Qté vendue</th><th>Qté dispo.</th><th>Transf. sortant</th><th>Transf. entrant</th>
+            </tr>
+          </thead>
+          <tbody id="bodyMotos">
+            {% for r in motos %}
+            <tr>
+              <td class="name">{{ r.name }}</td>
+              <td>{{ r.retail_price|floatformat:0 }}</td>
+              <td>{{ r.brand }}</td>
+              <td>{{ r.opening_qty }}</td>
+              <td>{{ r.sold_qty }}</td>
+              <td>{{ r.remaining_qty }}</td>
+              <td>{{ r.transfer_out }}</td>
+              <td>{{ r.transfer_in }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="8" class="muted">Aucune moto.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div id="pagerMotos" class="pager">
+        <div class="muted" style="font-size:.85rem;">Page <span id="mPage">1</span> / <span id="mPages">1</span></div>
+        <div><button id="mPrev" class="btn">Précédent</button> <button id="mNext" class="btn">Suivant</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODALS (lean; can be moved to base later) ===== -->
+<div id="modalPiece" class="modal" aria-hidden="true">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="hd">
+      <div class="title">Nouvelle Vente de Pièce(s)</div>
+      <button class="btn" data-close="#modalPiece">Fermer ✕</button>
+    </div>
+    <div class="bd">
+      <div class="grid g-4">
+        <div class="field"><label>Vente №</label><input id="p-num" readonly></div>
+        <div class="field"><label>Vendeur</label><input value="{{ request.user.get_full_name|default:request.user.username }}" readonly></div>
+        <div class="field"><label>Date</label><input id="p-date" readonly></div>
+        <div class="field"><label>Paiement</label><select id="p-pay"><option value="cash">Espèce</option><option value="mobile">Mobile Money</option><option value="card">Carte</option></select></div>
+        <div class="field"><label>Rechercher un nom (historique)</label><input id="p-client-q" placeholder="Tapez pour suggérer…"></div>
+        <div class="field"><label>Nom du Client</label><input id="p-client" placeholder="Nom"></div>
+        <div class="field"><label>Contact</label><input id="p-phone" placeholder="Téléphone"></div>
+        <div class="field"></div>
+      </div>
+      <div class="picker" style="margin-top:10px;">
+        <div class="head"><div class="row"><strong>Articles</strong><span class="muted" style="font-size:.85rem;">Cliquez un produit pour l’ajouter</span></div><input id="p-search" placeholder="Rechercher un produit (nom, marque)…"></div>
+        <div id="p-list" class="list"></div>
+      </div>
+      <div style="margin-top:10px;">
+        <div class="editable-hint"><span class="dot"></span><span>Le <strong>prix</strong> est modifiable si nécessaire.</span></div>
+        <table class="table">
+          <thead><tr><th>Produit</th><th>Qté</th><th>Min</th><th class="price">Prix</th><th>Total</th><th>—</th></tr></thead>
+          <tbody id="p-lines"></tbody>
+        </table>
+      </div>
+      <div class="row" style="justify-content:flex-end;margin-top:10px;">
+        <div class="title">Total : <span id="p-grand" style="color:var(--brand)">FCFA 0</span></div>
+      </div>
+      <div class="row" style="justify-content:flex-end;margin-top:12px;">
+        <button class="btn" data-close="#modalPiece">Annuler</button>
+        <button id="p-submit" class="btn btn-brand">Vendre</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="modalMoto" class="modal" aria-hidden="true">
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="hd">
+      <div class="title">Nouvelle Vente de Moto</div>
+      <button class="btn" data-close="#modalMoto">Fermer ✕</button>
+    </div>
+    <div class="bd">
+      <!-- EN-TÊTE : infos de base et paiement -->
+      <div class="grid g-4">
+        <div class="field"><label>Vente №</label><input id="m-num" readonly></div>
+        <div class="field"><label>Vendeur</label><input value="{{ request.user.get_full_name|default:request.user.username }}" readonly></div>
+        <div class="field"><label>Date</label><input id="m-date" readonly></div>
+        <div class="field"><label>Mode de Paiement</label>
+          <select id="m-pay">
+            <option value="cash">Espèce</option>
+            <option value="mobile">Mobile Money</option>
+            <option value="card">Carte</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- COORDONNÉES CLIENT -->
+      <div class="grid g-4" style="margin-top:10px;">
+        <div class="field"><label>Rechercher un client (historique)</label><input id="m-client-q" placeholder="Tapez pour suggérer…"></div>
+        <div class="field"><label>Nom (Surname)</label><input id="m-lastname" placeholder="Nom"></div>
+        <div class="field"><label>Prénom (Name)</label><input id="m-firstname" placeholder="Prénom"></div>
+        <div class="field"><label>Téléphone Mobile</label><input id="m-mobile" placeholder="Ex: 07 00 00 00"></div>
+        <div class="field"><label>Téléphone (Société)</label><input id="m-companyphone" placeholder="Si acheté par une société"></div>
+        <div class="field"><label>Téléphone Domicile</label><input id="m-homephone" placeholder="Fixe / Domicile"></div>
+        <div class="field"><label>Profession</label><input id="m-job" placeholder="Profession"></div>
+        <div class="field"><label>Adresse</label><input id="m-address" placeholder="Adresse complète"></div>
+        <div class="field"><label>Demeurant à</label><input id="m-resides" placeholder="Quartier / Ville"></div>
+      </div>
+
+      <!-- SÉLECTION MOTO -->
+      <div class="picker" style="margin-top:10px;">
+        <div class="head"><strong>Moto</strong><input id="m-search" placeholder="Rechercher…"></div>
+        <div id="m-list" class="list"></div>
+      </div>
+      <div id="m-selected-wrap" class="row hidden" style="margin-top:8px;align-items:center;gap:.6rem;">
+        <span class="price-badge" id="m-selected-label">—</span>
+        <button class="btn btn-red" id="m-clear">Effacer la sélection</button>
+      </div>
+
+      <!-- DÉTAILS MOTO ET PRIX -->
+      <div class="editable-hint"><span class="dot"></span><span>Le <strong>prix</strong> est modifiable mais <strong>jamais inférieur</strong> au minimum affiché.</span></div>
+      <div class="grid g-4" style="margin-top:10px;">
+        <div class="field"><label>Qté</label><input id="m-qty" type="number" value="1" min="1"></div>
+        <div class="field"><label>Min</label><input id="m-min" readonly></div>
+        <div class="field"><label>Prix</label><input id="m-price" type="number" class="price-input"></div>
+        <div class="field"><label>&nbsp;</label><div id="m-stock" class="muted" style="padding:.55rem .2rem">&nbsp;</div></div>
+        <div class="field"><label>N° de Châssis</label><input id="m-chassis" placeholder="Numéro de châssis"></div>
+        <div class="field"><label>N° Moteur</label><input id="m-engine" placeholder="Numéro moteur"></div>
+        <div class="field"><label>Montant en lettres</label><input id="m-amount-words" placeholder="Ex: Un million de FCFA"></div>
+        <div class="field"><label>&nbsp;</label><div class="muted" style="padding:.55rem .2rem">Complétez les champs ci‑dessus</div></div>
+      </div>
+
+      <div class="row" style="justify-content:flex-end;margin-top:10px;">
+        <div class="title">Total : <span id="m-grand" style="color:var(--brand)">FCFA 0</span></div>
+      </div>
+      <div class="row" style="justify-content:flex-end;margin-top:12px;">
+        <button class="btn" data-close="#modalMoto">Annuler</button>
+        <button id="m-submit" class="btn btn-dark">Vendre</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="modalCancel" class="modal" aria-hidden="true">
+  <div class="sheet" role="dialog" aria-modal="true" style="width:min(760px,95vw)">
+    <div class="hd">
+      <div class="title" style="color:var(--bad)">Annulation de vente</div>
+      <button class="btn" data-close="#modalCancel">Fermer ✕</button>
+    </div>
+    <div class="bd">
+      <div class="grid" style="gap:.6rem">
+        <div class="field">
+          <label>Numéro de reçu</label>
+          <div class="row" style="gap:.5rem; align-items:center">
+            <input id="c-number" placeholder="Ex: YO-210825-P-0007" style="flex:1; min-width:260px">
+            <button id="c-search" class="btn">Rechercher</button>
+          </div>
+        </div>
+
+        <div id="c-result" class="hidden">
+          <div id="c-meta" class="meta" style="margin:.25rem 0 .5rem 0;"></div>
+          <div class="divider"></div>
+          <div class="row" style="align-items:center; gap:.6rem; margin:.3rem 0;">
+            <label class="row" style="gap:.4rem; align-items:center"><input type="checkbox" id="c-all"> Tout sélectionner</label>
+          </div>
+          <div id="c-lines" class="picker" style="padding:.4rem .6rem"></div>
+
+          <div class="field">
+            <label>Motif (obligatoire)</label>
+            <textarea id="c-reason" rows="3" placeholder="Expliquez brièvement…" style="width:100%;border:1px solid var(--ring);border-radius:10px;padding:.55rem .75rem;"></textarea>
+          </div>
+
+          <div class="actions-bar">
+            <button id="c-now" class="btn btn-red hidden">Annuler maintenant</button>
+            <button id="c-request" class="btn hidden">Soumettre la demande</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="pageLoader" class="loader" aria-live="polite"><div class="spinner" aria-label="Chargement…"></div></div>
+<div class="toasts" id="toasts" aria-live="polite" role="status"></div>
+
+<script>
+document.addEventListener('DOMContentLoaded', ()=>{
+  const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
+  function getCSRF(){
+    const m = document.cookie.match('(^|;)\\s*csrftoken\\s*=\\s*([^;]+)');
+    if(m) return m.pop();
+    const el = document.querySelector('input[name="csrfmiddlewaretoken"]');
+    return el ? el.value : '';
+  }
+  const CSRF = getCSRF();
+  const toast=(msg,kind='info')=>{ const d=document.createElement('div'); d.className='toast '+(kind==='good'?'good':kind==='bad'?'bad':''); d.textContent=msg; $('#toasts').appendChild(d); setTimeout(()=>d.remove(),3500); };
+  const f=n=>Number(n||0).toLocaleString('fr-FR'); const pad=n=>n<10?'0'+n:n;
+  const nowStr=()=>{ const d=new Date(); return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+  const pageLoader=$('#pageLoader'), showLoader=()=>pageLoader.classList.add('show'), hideLoader=()=>pageLoader.classList.remove('show');
+
+  /* marquee clock */
+  const marq=$('#marqText'); const cap=s=>s? s.charAt(0).toUpperCase()+s.slice(1):s;
+  function tick(){ const n=new Date(); const dateStr=cap(n.toLocaleDateString('fr-FR',{weekday:'long',year:'numeric',month:'long',day:'numeric'})); marq.textContent=`ECAGES • {% if salespoint %}{{ salespoint.name }}{% else %}—{% endif %} • ${dateStr} — ${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`; }
+  tick(); setInterval(tick,1000);
+
+  /* tabs, pagination, search */
+  $$('.tab').forEach(b=>b.addEventListener('click',()=>{ $$('.tab').forEach(x=>x.classList.remove('active')); b.classList.add('active'); ['#tblPiecesWrap','#tblMotosWrap'].forEach(id=>$(id).classList.add('hidden')); $(b.dataset.target).classList.remove('hidden'); }));
+  let PAGE_SIZE=parseInt(document.getElementById('pageSize')?.value||'50',10)||50; const q=$('#q');
+  function makePager(tableId){
+    const tbody=document.querySelector(tableId+' tbody'); const all=[...tbody.querySelectorAll('tr')]; let filtered=all.slice(); let page=1;
+    function render(){ const totalPages=Math.max(1,Math.ceil(filtered.length/PAGE_SIZE)); if(page>totalPages) page=totalPages; const start=(page-1)*PAGE_SIZE, end=start+PAGE_SIZE; all.forEach(tr=>tr.style.display='none'); filtered.slice(start,end).forEach(tr=>tr.style.display=''); const isP=(tableId==="#tblPieces"); document.getElementById(isP?'pPage':'mPage').textContent=String(page); document.getElementById(isP?'pPages':'mPages').textContent=String(totalPages); document.getElementById(isP?'pPrev':'mPrev').disabled=page<=1; document.getElementById(isP?'pNext':'mNext').disabled=page>=totalPages; }
+    function applyFilter(term){ const t=(term||'').toLowerCase(); filtered = t? all.filter(tr=>tr.textContent.toLowerCase().includes(t)) : all.slice(); page=1; render(); }
+    document.getElementById(tableId==='#tblPieces'?'pPrev':'mPrev').addEventListener('click',()=>{ if(page>1){ page--; render(); }});
+    document.getElementById(tableId==='#tblPieces'?'pNext':'mNext').addEventListener('click',()=>{ const tp=Math.ceil(filtered.length/PAGE_SIZE)||1; if(page<tp){ page++; render(); }});
+    render(); return {applyFilter, render};
+  }
+  let piecesPager=makePager('#tblPieces'); let motosPager=makePager('#tblMotos');
+  q.addEventListener('input',()=>{ piecesPager.applyFilter(q.value); motosPager.applyFilter(q.value); });
+  document.getElementById('pageSize')?.addEventListener('change',()=>{ PAGE_SIZE=parseInt(document.getElementById('pageSize').value||'50',10)||50; piecesPager.render(); motosPager.render(); });
+
+  // ===== Soft refresh for stock tables (no full page reload) =====
+  const btnRefreshStock = document.getElementById('btnRefreshStock');
+  async function refreshStock(){
+    if(!btnRefreshStock) return;
+    try{
+      btnRefreshStock.classList.add('loading');
+      btnRefreshStock.textContent = 'Actualisation…';
+      const activeIsPieces = !document.getElementById('tblPiecesWrap').classList.contains('hidden');
+      const qval = (document.getElementById('q')?.value||'');
+      const ps = PAGE_SIZE;
+
+      // Fetch current page HTML and extract fresh table bodies
+      const res = await fetch(window.location.href, { headers: { 'X-Requested-With':'XMLHttpRequest' } });
+      const html = await res.text();
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const newPieces = doc.querySelector('#bodyPieces');
+      const newMotos  = doc.querySelector('#bodyMotos');
+      if(newPieces && newMotos){
+        document.querySelector('#bodyPieces').innerHTML = newPieces.innerHTML;
+        document.querySelector('#bodyMotos').innerHTML  = newMotos.innerHTML;
+
+        // Reset pager button listeners by cloning nodes (prevents duplications)
+        ['pPrev','pNext','mPrev','mNext'].forEach(id=>{
+          const btn = document.getElementById(id);
+          if(btn){ const clone = btn.cloneNode(true); btn.parentNode.replaceChild(clone, btn); }
+        });
+
+        // Rebuild pagers and reapply search filter
+        PAGE_SIZE = ps;
+        piecesPager = makePager('#tblPieces');
+        motosPager  = makePager('#tblMotos');
+        if(qval){
+          document.getElementById('q').value = qval;
+          piecesPager.applyFilter(qval);
+          motosPager.applyFilter(qval);
+        }
+        // Restore active tab visibility
+        document.getElementById('tblPiecesWrap').classList.toggle('hidden', !activeIsPieces);
+        document.getElementById('tblMotosWrap').classList.toggle('hidden', activeIsPieces);
+
+        toast('Stock actualisé.','good');
+      } else {
+        toast("Impossible d'actualiser.",'bad');
+      }
+    }catch(e){
+      toast('Erreur lors de la mise à jour.','bad');
+    } finally {
+      if(btnRefreshStock){ btnRefreshStock.classList.remove('loading'); btnRefreshStock.textContent = 'Actualiser'; }
+    }
+  }
+  btnRefreshStock?.addEventListener('click', refreshStock);
+
+  // ===== Soft refresh for pending cancellations =====
+  const btnRefreshPending = document.getElementById('btnRefreshPending');
+  async function refreshPending(){
+    if(!btnRefreshPending) return;
+    try{
+      btnRefreshPending.classList.add('loading');
+      btnRefreshPending.textContent = 'Actualisation…';
+      const res = await fetch(window.location.href, { headers: { 'X-Requested-With':'XMLHttpRequest' } });
+      const html = await res.text();
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const newBody = doc.querySelector('#pendingBody');
+      if(newBody){
+        document.querySelector('#pendingBody').innerHTML = newBody.innerHTML;
+        const msg = document.querySelector('#pendingBody').children.length ? 'Liste actualisée.' : 'Aucune demande pour aujourd’hui.';
+        toast(msg, 'good');
+      } else {
+        toast("Impossible d'actualiser la liste.", 'bad');
+      }
+    }catch(e){
+      toast('Erreur lors de la mise à jour.', 'bad');
+    }finally{
+      btnRefreshPending.classList.remove('loading');
+      btnRefreshPending.textContent = 'Actualiser';
+    }
+  }
+  btnRefreshPending?.addEventListener('click', refreshPending);
+
+  // ===== Keyboard shortcuts =====
+  // Note: we avoid interfering when focus is inside form fields
+  document.addEventListener('keydown', (e)=>{
+    const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+    const inEditable = tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable;
+    if(inEditable) return;
+
+    // Ctrl+P — Open Pieces sale modal
+    if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p'){
+      e.preventDefault();
+      openPieces();
+      return;
+    }
+    // Ctrl+M — Open Moto sale modal
+    if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'm'){
+      e.preventDefault();
+      openMotoModal();
+      return;
+    }
+    // Ctrl+/ — Focus the stock search box
+    if((e.ctrlKey || e.metaKey) && (e.key === '/' || e.key === '?')){
+      e.preventDefault();
+      const search = document.getElementById('q');
+      if(search){ search.focus(); search.select(); }
+      return;
+    }
+    // Ctrl+Alt+C — Open cancel request modal
+    if((e.ctrlKey || e.metaKey) && e.altKey && e.key.toLowerCase() === 'c'){
+      e.preventDefault();
+      openModal('#modalCancel');
+      return;
+    }
+    // Ctrl+Shift+R — Soft refresh stock tables (avoid clashing with browser Ctrl+R)
+    if((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'r'){
+      e.preventDefault();
+      refreshStock();
+      return;
+    }
+  });
+
+  /* modal helpers */
+  function openModal(id){ const m=$(id); if(!m) return; m.classList.add('show'); }
+  function closeModal(id){ const m=$(id); if(!m) return; m.classList.remove('show'); }
+  document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>closeModal(b.getAttribute('data-close'))));
+  document.addEventListener('keydown',(e)=>{ if(e.key==='Escape'){ const open=document.querySelector('.modal.show'); if(open){ closeModal('#'+open.id); } }});
+
+  /* client suggest */
+  async function fetchJSON(url){ const r=await fetch(url); if(!r.ok) throw new Error('HTTP '+r.status); return await r.json(); }
+  const debounce=(fn,ms)=>{ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; };
+  function enableClientSuggest(inputId, targetNameId, targetPhoneId){
+    const input=document.querySelector(inputId), nameEl=document.querySelector(targetNameId), phoneEl=document.querySelector(targetPhoneId);
+    const box=document.createElement('div'); Object.assign(box.style,{position:'absolute',background:'#fff',border:'1px solid var(--ring)',borderRadius:'8px',boxShadow:'0 8px 24px rgba(0,0,0,.06)',marginTop:'4px',maxHeight:'240px',overflow:'auto',minWidth:input.offsetWidth+'px',zIndex:10}); box.classList.add('hidden'); input.parentNode.style.position='relative'; input.parentNode.appendChild(box);
+    const run=debounce(async ()=>{ const val=input.value||''; if(!val){box.classList.add('hidden'); box.innerHTML=''; return;} try{ const items=await fetchJSON(`/sales/api/clients/?q=${encodeURIComponent(val)}`); box.innerHTML=''; items.forEach(it=>{ const row=document.createElement('div'); row.style.padding='.45rem .6rem'; row.style.cursor='pointer'; row.textContent=it.name+(it.phone?` – ${it.phone}`:''); row.onclick=()=>{ nameEl.value=it.name; if(it.phone) phoneEl.value=it.phone; box.classList.add('hidden'); box.innerHTML=''; }; box.appendChild(row); }); box.classList.remove('hidden'); }catch{ box.classList.add('hidden'); } },180);
+    input.addEventListener('input',run); input.addEventListener('blur',()=>setTimeout(()=>box.classList.add('hidden'),150));
+  }
+  enableClientSuggest('#p-client-q','#p-client','#p-phone');
+  // Moto client suggest: fills surname, name and mobile
+  (function(){
+    const input=document.querySelector('#m-client-q');
+    if(!input) return;
+    const box=document.createElement('div');
+    Object.assign(box.style,{position:'absolute',background:'#fff',border:'1px solid var(--ring)',borderRadius:'8px',boxShadow:'0 8px 24px rgba(0,0,0,.06)',marginTop:'4px',maxHeight:'240px',overflow:'auto',minWidth:input.offsetWidth+'px',zIndex:10});
+    box.classList.add('hidden');
+    input.parentNode.style.position='relative';
+    input.parentNode.appendChild(box);
+    const run=debounce(async ()=>{
+      const val=input.value||''; if(!val){box.classList.add('hidden'); box.innerHTML=''; return;}
+      try{
+        const items=await fetchJSON(`/sales/api/clients/?q=${encodeURIComponent(val)}`);
+        box.innerHTML='';
+        items.forEach(it=>{
+          const row=document.createElement('div');
+          row.style.padding='.45rem .6rem'; row.style.cursor='pointer';
+          row.textContent=(it.name||'')+(it.phone?` – ${it.phone}`:'');
+          row.onclick=()=>{
+            // best effort split
+            const nm=(it.name||'').trim();
+            const parts=nm.split(/\s+/);
+            document.querySelector('#m-lastname').value=parts.length>1? parts.slice(0,-1).join(' ') : nm;
+            document.querySelector('#m-firstname').value=parts.length>1? parts.slice(-1).join(' ') : '';
+            if(it.phone) document.querySelector('#m-mobile').value=it.phone;
+            box.classList.add('hidden'); box.innerHTML='';
+          };
+          box.appendChild(row);
+        });
+        box.classList.remove('hidden');
+      }catch{ box.classList.add('hidden'); }
+    },180);
+    input.addEventListener('input',run);
+    input.addEventListener('blur',()=>setTimeout(()=>box.classList.add('hidden'),150));
+  })();
+
+  /* pieces modal */
+  const pList=document.querySelector('#p-list'), pSearch=document.querySelector('#p-search'), pLines=document.querySelector('#p-lines');
+  let pieceCache=null;
+  async function ensurePieces(){
+    if(pieceCache) return pieceCache;
+    // Try API first
+    try{
+      const api = await fetchJSON('/sales/api/products/?type=piece');
+      // Normalize expected fields
+      pieceCache = (api||[]).map(x=>({
+        product_id: Number(x.product_id||x.id||0),
+        name: x.name||'',
+        brand: x.brand||x.brand_name||'',
+        price: Number(x.price||x.retail_price||0),
+        available: Number(x.available||x.remaining_qty||x.stock||0)
+      }));
+      return pieceCache;
+    }catch(e){
+      // Fallback: read current table rows to build a local list
+      const rows = Array.from(document.querySelectorAll('#bodyPieces tr'));
+      const fromDom = rows.map(tr=>{
+        const tds = tr.querySelectorAll('td');
+        if(tds.length < 8) return null;
+        const name = tds[0]?.textContent?.trim()||'';
+        const price = Number((tds[1]?.textContent||'0').replace(/[^0-9]/g,''))||0;
+        const brand = tds[2]?.textContent?.trim()||'';
+        const available = Number((tds[5]?.textContent||'0').replace(/[^0-9]/g,''))||0; // "Qté dispo." column
+        return { product_id: 0, name, brand, price, available };
+      }).filter(Boolean);
+      pieceCache = fromDom;
+      return pieceCache;
+    }
+  }
+  const renderPieceResults=(items)=>{
+    pList.innerHTML='';
+    if(!items.length){ pList.classList.add('hidden'); pList.innerHTML='<div class="muted" style="padding:.6rem;">Aucun résultat.</div>'; return; }
+    items.forEach(d=>{
+      const row=document.createElement('div');
+      row.className='item';
+      row.innerHTML=`<div class="name">${d.name}${d.brand?` <span class='dim'>— ${d.brand}</span>`:''}</div><div class="dim">Min: <span class='price-badge'>FCFA ${f(d.price)}</span></div><div class="dim">Stock: ${d.available}</div><div class="dim"><button class="btn">Ajouter</button></div>`;
+      const add=()=>{ addPieceLine(d); pList.innerHTML=''; pList.classList.add('hidden'); };
+      row.addEventListener('click',e=>{ if(e.target.tagName!=='BUTTON') add(); });
+      row.querySelector('button').addEventListener('click',e=>{ e.stopPropagation(); add(); });
+      pList.appendChild(row);
+    });
+    pList.classList.remove('hidden');
+  };
+  const filterPieces = debounce(async()=>{
+    const txt=(pSearch.value||'').toLowerCase();
+    if(!txt){ pList.innerHTML=''; pList.classList.add('hidden'); return; }
+    try{
+      const data = await ensurePieces();
+      const found = data.filter(d=>(d.name+' '+(d.brand||'')).toLowerCase().includes(txt));
+      renderPieceResults(found.slice(0,160));
+    }catch(err){
+      pList.innerHTML='';
+      pList.classList.add('hidden');
+      toast("Recherche indisponible pour le moment.", 'bad');
+    }
+  },180);
+  pSearch.addEventListener('input',filterPieces);
+  function updatePiecesGrand(){ let sum=0; pLines.querySelectorAll('.line .total').forEach(td=>{ const n=Number((td.textContent||'0').replace(/\s/g,'')); sum+=n; }); document.querySelector('#p-grand').textContent=`FCFA ${f(sum)}`; }
+  function addPieceLine(d){
+    if(Number(d.available)<=0){ toast('Stock indisponible pour cet article.','bad'); return; }
+    const tr=document.createElement('tr');
+    tr.className='line';
+    tr.dataset.pid=d.product_id;
+    tr.innerHTML=`<td><strong>${d.name}</strong> ${d.brand?`<span class='muted'>— ${d.brand}</span>`:''}</td>
+      <td><input type='number' class='qty' min='1' value='1' style='width:90px'></td>
+      <td><input class='minv' readonly value='${Math.round(Number(d.price||0))}' style='width:100px'></td>
+      <td><input type='number' class='unit price-input' value='${Math.round(Number(d.price||0))}' style='width:140px'></td>
+      <td class='total'>0</td>
+      <td><button class='btn'>Suppr.</button></td>`;
+    pLines.appendChild(tr);
+    const qty=tr.querySelector('.qty'), unit=tr.querySelector('.unit'), minv=tr.querySelector('.minv'), total=tr.querySelector('.total');
+    qty.max=String(d.available||999999);
+    function recalc(){
+      let q=Math.max(1,Math.round(Number(qty.value||1)));
+      const av=Number(d.available||0);
+      if(q>av){ q=av; qty.value=av; toast('La quantité demandée dépasse le stock disponible.','bad'); }
+      let p=Math.round(Number(unit.value||0));
+      const mn=Math.round(Number(minv.value||0));
+      if(p<mn){ p=mn; unit.value=mn; toast('Le prix ne peut pas être inférieur au minimum.','bad'); }
+      total.textContent=f(q*p);
+      updatePiecesGrand();
+    }
+    qty.addEventListener('input',recalc);
+    unit.addEventListener('input',recalc);
+    tr.querySelector('.btn').addEventListener('click',()=>{ tr.remove(); updatePiecesGrand(); });
+    recalc();
+    // Hide suggestions until user types again
+    pList.innerHTML='';
+    pList.classList.add('hidden');
+    pSearch.value='';
+    pList.classList.add('hidden');
+    // Focus the editable price so user sees it can be changed
+    unit.focus(); unit.select();
+  }
+  async function openPieces(){ document.querySelector('#p-date').value=nowStr(); try{ const inv=await fetchJSON('/sales/api/invoice-number/?kind=P'); document.querySelector('#p-num').value=inv.number; }catch{ document.querySelector('#p-num').value='—'; } pList.innerHTML=''; pSearch.value=''; pLines.innerHTML=''; document.querySelector('#p-grand').textContent='FCFA 0'; openModal('#modalPiece'); }
+  document.getElementById('btnPiece')?.addEventListener('click',(e)=>{ e.preventDefault(); openPieces(); });
+
+  /* moto modal */
+  const mList=document.querySelector('#m-list'), mSearch=document.querySelector('#m-search'); let motoCache=null;
+
+  // Helper to clear moto selection and related fields
+  function clearMotoSelection(){
+    const selWrap=document.getElementById('m-selected-wrap');
+    const selLbl=document.getElementById('m-selected-label');
+    if(selLbl) selLbl.textContent='—';
+    if(selWrap) selWrap.classList.add('hidden');
+    document.querySelector('#m-search').value='';
+    mList.innerHTML='';
+    mList.dataset.pid='';
+    const qtyEl=document.querySelector('#m-qty');
+    const minEl=document.querySelector('#m-min');
+    const priceEl=document.querySelector('#m-price');
+    const stockEl=document.querySelector('#m-stock');
+    const grandEl=document.querySelector('#m-grand');
+    const chassisEl=document.querySelector('#m-chassis');
+    const engineEl=document.querySelector('#m-engine');
+    const amountWordsEl=document.querySelector('#m-amount-words');
+    if(qtyEl) qtyEl.value=1;
+    if(minEl) minEl.value='';
+    if(priceEl) priceEl.value='';
+    if(stockEl) stockEl.textContent='';
+    if(grandEl) grandEl.textContent='FCFA 0';
+    if(chassisEl) chassisEl.value='';
+    if(engineEl) engineEl.value='';
+    if(amountWordsEl) amountWordsEl.value='';
+  }
+
+  const ensureMotos=async()=>{ if(motoCache) return motoCache; motoCache=await fetchJSON('/sales/api/products/?type=moto'); return motoCache; };
+  const filterMotos=debounce(async()=>{
+    const txt=(mSearch.value||'').toLowerCase();
+    if(!txt){ mList.innerHTML=''; return; }
+    const data=await ensureMotos();
+    const found=data.filter(d=>(d.name+' '+(d.brand||'')).toLowerCase().includes(txt));
+    mList.innerHTML='';
+    found.slice(0,120).forEach(d=>{
+      const row=document.createElement('div');
+      row.className='item';
+      row.innerHTML=`<div class='name'>${d.name}${d.brand?` <span class='dim'>— ${d.brand}</span>`:''}</div><div class='dim'>Min: <span class='price-badge'>FCFA ${f(d.price)}</span></div><div class='dim'>Stock: ${d.available}</div><div class='dim'><button class='btn'>Choisir</button></div>`;
+      const choose=()=>selectMoto(d);
+      row.addEventListener('click',choose);
+      row.querySelector('button').addEventListener('click',(e)=>{ e.stopPropagation(); choose(); });
+      mList.appendChild(row);
+    });
+  },180);
+  mSearch.addEventListener('input',filterMotos);
+  function selectMoto(d){
+    document.querySelector('#m-qty').value=1;
+    document.querySelector('#m-min').value=Math.round(Number(d.price||0));
+    document.querySelector('#m-price').value=Math.round(Number(d.price||0));
+    document.querySelector('#m-qty').max=String(d.available||999999);
+    document.querySelector('#m-qty').dataset.avail=String(d.available||0);
+    document.querySelector('#m-stock').textContent=d.available?`Disponible: ${d.available}`:'';
+    document.querySelector('#m-grand').textContent=`FCFA ${f(Number(document.querySelector('#m-price').value||0))}`;
+    mList.innerHTML='';
+    // Show selected moto and clear button
+    const selLbl=document.getElementById('m-selected-label');
+    const selWrap=document.getElementById('m-selected-wrap');
+    if(selLbl) selLbl.textContent=`Moto : ${d.name}${d.brand? ' — '+d.brand : ''}`;
+    if(selWrap) selWrap.classList.remove('hidden');
+    mList.dataset.pid=d.product_id;
+  }
+  // Add clear button event after selectMoto is defined
+  const mClearBtn=document.getElementById('m-clear');
+  if(mClearBtn){ mClearBtn.addEventListener('click',(e)=>{ e.preventDefault(); clearMotoSelection(); }); }
+  function updateMotoTotal(){
+    const qtyEl=document.querySelector('#m-qty');
+    const priceEl=document.querySelector('#m-price');
+    const minEl=document.querySelector('#m-min');
+    const grandEl=document.querySelector('#m-grand');
+
+    let q=Math.max(1,Math.round(Number(qtyEl.value||1)));
+    const avail=Number(qtyEl.dataset.avail||0);
+    if(avail && q>avail){ q=avail; qtyEl.value=String(avail); toast('La quantité demandée dépasse le stock disponible.','bad'); }
+
+    let p=Math.round(Number(priceEl.value||0));
+    const mn=Math.round(Number(minEl.value||0));
+    if(mn && p<mn){ p=mn; priceEl.value=String(mn); toast('Le prix ne peut pas être inférieur au minimum.','bad'); }
+
+    const total=q*p;
+    if(grandEl) grandEl.textContent=`FCFA ${f(total)}`;
+  }
+  document.getElementById('m-qty').addEventListener('input',updateMotoTotal);
+  document.getElementById('m-price').addEventListener('input',updateMotoTotal);
+  // Auto Title-Case for "Montant en lettres" (first letter of each word uppercase)
+  (function(){
+    const amt = document.getElementById('m-amount-words');
+    if(!amt) return;
+    const toTitleCase = (str)=>{
+      if(!str) return '';
+      // Lowercase everything, then uppercase first letter of each Unicode word
+      return str.toLowerCase().replace(/\b(\p{L})(\p{L}*)/gu, (m,a,b)=>a.toUpperCase()+b);
+    };
+    const onInput = ()=>{
+      const start = amt.selectionStart, end = amt.selectionEnd;
+      const next = toTitleCase(amt.value);
+      if(amt.value !== next){
+        amt.value = next;
+        try{ amt.setSelectionRange(start, end); }catch{}
+      }
+    };
+    amt.addEventListener('input', onInput);
+    amt.addEventListener('blur', ()=>{ amt.value = toTitleCase(amt.value); });
+  })();
+  async function openMotoModal(){
+    document.querySelector('#m-date').value=nowStr();
+    try{ const inv=await fetchJSON('/sales/api/invoice-number/?kind=M'); document.querySelector('#m-num').value=inv.number; }
+    catch{ document.querySelector('#m-num').value='—'; }
+    clearMotoSelection();
+    document.querySelector('#m-client-q').value='';
+    // reset client fields
+    document.querySelector('#m-lastname').value='';
+    document.querySelector('#m-firstname').value='';
+    document.querySelector('#m-mobile').value='';
+    document.querySelector('#m-companyphone').value='';
+    document.querySelector('#m-homephone').value='';
+    document.querySelector('#m-job').value='';
+    document.querySelector('#m-address').value='';
+    document.querySelector('#m-resides').value='';
+    openModal('#modalMoto');
+  }
+  document.getElementById('btnMoto')?.addEventListener('click',(e)=>{ e.preventDefault(); openMotoModal(); });
+
+  const mSubmitBtn=document.getElementById('m-submit');
+  mSubmitBtn.addEventListener('click', async ()=>{
+    if(mSubmitBtn.disabled) return;
+    const pid=Number(mList.dataset.pid||0);
+    if(!pid){ toast('Veuillez choisir la moto.','bad'); return; }
+
+    const qty=Math.round(Number(document.querySelector('#m-qty').value||0));
+    const minv=Math.round(Number(document.querySelector('#m-min').value||0));
+    const price=Math.round(Number(document.querySelector('#m-price').value||0));
+    if(qty<=0){ toast('Quantité invalide.','bad'); return; }
+    if(price<minv){ toast('Le prix ne peut pas être inférieur au minimum.','bad'); return; }
+
+    // New customer fields
+    const lastname=(document.querySelector('#m-lastname').value||'').trim();
+    const firstname=(document.querySelector('#m-firstname').value||'').trim();
+    const mobile=(document.querySelector('#m-mobile').value||'').trim();
+    const companyPhone=(document.querySelector('#m-companyphone').value||'').trim();
+    const homePhone=(document.querySelector('#m-homephone').value||'').trim();
+    const job=(document.querySelector('#m-job').value||'').trim();
+    const address=(document.querySelector('#m-address').value||'').trim();
+    const resides=(document.querySelector('#m-resides').value||'').trim();
+    const chassis=(document.querySelector('#m-chassis').value||'').trim();
+    const engine=(document.querySelector('#m-engine').value||'').trim();
+    const amountWords=(document.querySelector('#m-amount-words').value||'').trim();
+
+    const fullName=(lastname||firstname)? `${lastname}${lastname&&firstname?' ':''}${firstname}` : 'DIVERS';
+
+    const payload={
+      kind:'M',
+      customer_name: fullName,
+      customer_phone: mobile || companyPhone || homePhone || '',
+      payment_type:(document.querySelector('#m-pay').value||'cash'),
+      items:[{product_id:pid, qty:qty, unit_price:price}],
+      // Extra details for back-office / printing (server may ignore if unsupported)
+      customer_details:{
+        surname: lastname,
+        name: firstname,
+        mobile_phone: mobile,
+        company_phone: companyPhone,
+        home_phone: homePhone,
+        profession: job,
+        address: address,
+        resides_at: resides,
+        chassis_number: chassis,
+        engine_number: engine,
+        amount_in_words: amountWords
+      }
+    };
+
+    try{
+      mSubmitBtn.disabled=true;
+      const oldTxt=mSubmitBtn.textContent;
+      mSubmitBtn.textContent='Vente en cours…';
+      showLoader();
+      const r=await fetch('/sales/api/create-sale-draft/',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':CSRF}, body:JSON.stringify(payload)});
+      const res=await r.json();
+      if(res.ok){
+        toast(`Vente enregistrée (${res.number}).`,'good');
+        closeModal('#modalMoto');
+        setTimeout(()=>location.reload(),700);
+      } else {
+        hideLoader();
+        toast(res.error||'Erreur.','bad');
+        mSubmitBtn.disabled=false; mSubmitBtn.textContent=oldTxt;
+      }
+    }catch{
+      hideLoader();
+      toast('Erreur réseau.','bad');
+      mSubmitBtn.disabled=false; mSubmitBtn.textContent='Vendre';
+    }
+  });
+
+  const pSubmitBtn=document.getElementById('p-submit');
+  pSubmitBtn.addEventListener('click', async ()=>{ if(pSubmitBtn.disabled) return; const items=[]; document.querySelectorAll('#p-lines .line').forEach(tr=>{ const pid=Number(tr.dataset.pid||0); const q=Math.round(Number(tr.querySelector('.qty').value||0)); const p=Math.round(Number(tr.querySelector('.unit').value||0)); const mn=Math.round(Number(tr.querySelector('.minv').value||0)); if(pid && q>0 && p>=mn) items.push({product_id:pid, qty:q, unit_price:p}); }); if(!items.length){ toast('Ajoutez au moins un article.','bad'); return; } const payload={ kind:'P', customer_name:(document.querySelector('#p-client').value||'DIVERS'), customer_phone:(document.querySelector('#p-phone').value||''), payment_type:(document.querySelector('#p-pay').value||'cash'), items }; try{ pSubmitBtn.disabled=true; const oldTxt=pSubmitBtn.textContent; pSubmitBtn.textContent='Vente en cours…'; showLoader(); const r=await fetch('/sales/api/create-sale-draft/',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':CSRF}, body:JSON.stringify(payload)}); const res=await r.json(); if(res.ok){ toast(`Vente enregistrée (${res.number}).`,'good'); closeModal('#modalPiece'); setTimeout(()=>location.reload(),700); } else { hideLoader(); toast(res.error||'Erreur.','bad'); pSubmitBtn.disabled=false; pSubmitBtn.textContent=oldTxt; } }catch{ hideLoader(); toast('Erreur réseau.','bad'); pSubmitBtn.disabled=false; pSubmitBtn.textContent='Vendre'; } });
+
+
+  // ===== Cancellation modal wiring (same-day vs request) =====
+  (function(){
+    const CSRF = (document.cookie.match('(^|;)\\s*csrftoken\\s*=\\s*([^;]+)')||[]).pop()||'';
+    const cNumber = document.getElementById('c-number');
+    const cSearch = document.getElementById('c-search');
+    const cResult = document.getElementById('c-result');
+    const cMeta   = document.getElementById('c-meta');
+    const cLines  = document.getElementById('c-lines');
+    const cAll    = document.getElementById('c-all');
+    const cNow    = document.getElementById('c-now');
+    const cReq    = document.getElementById('c-request');
+    const cReason = document.getElementById('c-reason');
+    let cState = null; // { sale_id, number, is_today, items:[{id, product, qty, unit_price, line_total}], customer_name, payment_type }
+
+    const f = n => Number(n||0).toLocaleString('fr-FR');
+    const toast=(msg,kind='info')=>{ const d=document.createElement('div'); d.className='toast '+(kind==='good'?'good':kind==='bad'?'bad':''); d.textContent=msg; document.getElementById('toasts').appendChild(d); setTimeout(()=>d.remove(),3500); };
+    const pageLoader=document.getElementById('pageLoader');
+    const showLoader=()=>pageLoader.classList.add('show');
+    const hideLoader=()=>pageLoader.classList.remove('show');
+
+    function resetCancelUI(){
+      cState = null;
+      if(cResult) cResult.classList.add('hidden');
+      if(cMeta) cMeta.textContent = '';
+      if(cLines) cLines.innerHTML = '';
+      if(cAll) cAll.checked = false;
+      if(cReason) cReason.value = '';
+      if(cNow) cNow.classList.add('hidden');
+      if(cReq) cReq.classList.add('hidden');
+    }
+
+    async function findByNumber(){
+      const num = (cNumber?.value||'').trim();
+      if(!num){ toast('Saisissez un numéro de reçu.', 'bad'); return; }
+      try{
+        showLoader();
+        const r = await fetch(`/sales/api/find-sale-by-number/?q=${encodeURIComponent(num)}`);
+        const res = await r.json();
+        hideLoader();
+        if(!res.ok){
+          toast(res.error||'Reçu introuvable.', 'bad');
+          resetCancelUI();
+          return;
+        }
+        cState = {
+          sale_id: res.sale_id,
+          number: res.number,
+          is_today: !!res.is_today,
+          items: res.items||[],
+          customer_name: res.customer_name || '',
+          payment_type: res.payment_type || ''
+        };
+        renderCancelResult();
+      }catch(e){
+        hideLoader();
+        toast('Erreur réseau.', 'bad');
+      }
+    }
+
+    function renderCancelResult(){
+      if(!cState) return;
+
+      // Build meta chips
+      const dayPill = cState.is_today
+        ? `<span class="pill">Vente du jour</span>`
+        : `<span class="pill bad">Vente antérieure</span>`;
+      const clientPill = cState.customer_name ? `<span class="pill">Client&nbsp;: ${cState.customer_name}</span>` : '';
+      const payPill = cState.payment_type ? `<span class="pill">Paiement&nbsp;: ${cState.payment_type}</span>` : '';
+      cMeta.innerHTML = `<span class="pill">Reçu&nbsp;${cState.number}</span>${dayPill}${clientPill}${payPill}`;
+
+      // Render lines as a neat table
+      const rows = (cState.items||[]).map(it => {
+        return `
+          <tr>
+            <td style="width:28px;">
+              <input type="checkbox" class="c-line-check" data-sid="${String(it.id)}" data-qty="${String(it.qty)}">
+            </td>
+            <td><strong>${it.product}</strong></td>
+            <td class="muted">Qté: ${it.qty}</td>
+            <td class="muted">Total: FCFA ${f(it.line_total)}</td>
+          </tr>
+        `;
+      }).join('') || `<tr><td colspan="4" class="muted">Aucun article.</td></tr>`;
+
+      cLines.innerHTML = `
+        <table class="table-lite">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Produit</th>
+              <th>Qté</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+
+      // Toggle buttons
+      if(cState.is_today){
+        cNow.classList.remove('hidden');
+        cReq.classList.add('hidden');
+      }else{
+        cReq.classList.remove('hidden');
+        cNow.classList.add('hidden');
+      }
+      cResult.classList.remove('hidden');
+    }
+
+    function getSelectedMap(){
+      const map = {};
+      document.querySelectorAll('.c-line-check:checked').forEach(cb => {
+        const sid = Number(cb.dataset.sid||0);
+        const q = Number(cb.dataset.qty||0);
+        if(sid && q){ map[sid] = q; }
+      });
+      return map;
+    }
+
+    cAll?.addEventListener('change', ()=>{
+      const checked = cAll.checked;
+      document.querySelectorAll('.c-line-check').forEach(cb => { cb.checked = checked; });
+    });
+
+    document.getElementById('btnCancel')?.addEventListener('click',(e)=>{
+      e.preventDefault();
+      resetCancelUI();
+      document.getElementById('modalCancel').classList.add('show');
+      setTimeout(()=>{ cNumber?.focus(); }, 80);
+    });
+
+    cSearch?.addEventListener('click', (e)=>{ e.preventDefault(); findByNumber(); });
+
+    cNow?.addEventListener('click', async ()=>{
+      if(!cState){ toast('Aucune vente chargée.', 'bad'); return; }
+      const sel = getSelectedMap();
+      if(Object.keys(sel).length === 0){ toast('Sélectionnez au moins un article.', 'bad'); return; }
+      const reason = (cReason?.value||'').trim();
+      if(!reason){ toast('Veuillez saisir un motif.', 'bad'); return; }
+      try{
+        showLoader();
+        const r = await fetch('/sales/api/cancel-sale-immediate/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+          credentials: 'same-origin',
+          body: JSON.stringify({ sale_id: cState.sale_id, item_quantities: sel, reason })
+        });
+        const res = await r.json();
+        hideLoader();
+        if(res.ok){
+          toast('Annulation effectuée.', 'good');
+          document.getElementById('modalCancel').classList.remove('show');
+          setTimeout(()=>location.reload(), 600);
+        } else {
+          toast(res.error||"Échec de l'annulation.", 'bad');
+        }
+      }catch{ hideLoader(); toast('Erreur réseau.', 'bad'); }
+    });
+
+    cReq?.addEventListener('click', async ()=>{
+      if(!cState){ toast('Aucune vente chargée.', 'bad'); return; }
+      const sel = getSelectedMap();
+      if(Object.keys(sel).length === 0){ toast('Sélectionnez au moins un article.', 'bad'); return; }
+      try{
+        showLoader();
+        const r = await fetch('/sales/api/cancel-sale-request/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+          credentials: 'same-origin',
+          body: JSON.stringify({ sale_id: cState.sale_id, item_quantities: sel, reason: (cReason?.value||'').trim() })
+        });
+        const res = await r.json();
+        hideLoader();
+        if(res.ok){
+          toast('Demande envoyée pour validation.', 'good');
+          document.getElementById('modalCancel').classList.remove('show');
+        } else {
+          toast(res.error||'Échec de la demande.', 'bad');
+        }
+      }catch{ hideLoader(); toast('Erreur réseau.', 'bad'); }
+    });
+  })();
+
+  document.querySelector('#p-date').value=nowStr(); document.querySelector('#m-date').value=nowStr();
+});
+</script>
+{% endblock %}

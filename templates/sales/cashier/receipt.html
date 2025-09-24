@@ -1,0 +1,81 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Reçu {{ sale.number }}</title>
+  <style>
+    :root{ --ink:#0f172a; --muted:#64748b; }
+    *{ box-sizing:border-box; }
+    html,body{ margin:0; padding:0; }
+    body{ font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; color:var(--ink); }
+    .ticket{ max-width:380px; margin:0 auto; padding:12px; }
+    .box{ border:1px dashed #cbd5e1; border-radius:8px; padding:12px; }
+    h1{ font-size:16px; margin:0 0 6px 0; }
+    .meta{ font-size:12px; color:var(--muted); line-height:1.35; margin-bottom:6px; }
+    hr{ border:0; border-top:1px solid #e2e8f0; margin:8px 0; }
+    table{ width:100%; border-collapse:collapse; font-size:12px; }
+    th,td{ padding:4px 0; border-bottom:1px solid #f1f5f9; text-align:left; }
+    th:last-child, td:last-child{ text-align:right; }
+    th:nth-child(2), td:nth-child(2){ text-align:right; }
+    th:nth-child(3), td:nth-child(3){ text-align:right; }
+    tfoot td{ border-bottom:0; }
+    .right{ text-align:right; }
+    .total{ font-weight:700; font-size:13px; }
+    .muted{ color:var(--muted); }
+    .center{ text-align:center; }
+    @media print{ body{ background:#fff; } .ticket{ padding:0; } .box{ border:0; } }
+  </style>
+</head>
+<body onload="window.print()">
+  <div class="ticket">
+    <div class="box">
+      <h1>Reçu de paiement</h1>
+      <div class="meta">
+        <div><strong>N°:</strong> {{ sale.number }}</div>
+        <div><strong>Client:</strong> {{ sale.customer_name }}</div>
+        <div><strong>Date:</strong> {{ sale.created_at|date:"d/m/Y H:i" }}</div>
+      </div>
+      <hr>
+      <table>
+        <thead>
+          <tr>
+            <th>Produit</th>
+            <th>Qté</th>
+            <th>PU</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for li in sale.items.all %}
+          <tr>
+            <td>{{ li.product.name }}</td>
+            <td>{{ li.quantity }}</td>
+            <td>{{ li.unit_price|floatformat:0 }}</td>
+            <td>{{ li.line_total|floatformat:0 }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3" class="right total">Total</td>
+            <td class="total">{{ sale.total_amount|floatformat:0 }}</td>
+          </tr>
+          {% if sale.paid_amount %}
+          <tr>
+            <td colspan="3" class="right">Reçu</td>
+            <td>{{ sale.paid_amount|floatformat:0 }}</td>
+          </tr>
+          {% endif %}
+          {% if change %}
+          <tr>
+            <td colspan="3" class="right">Monnaie</td>
+            <td>{{ change|floatformat:0 }}</td>
+          </tr>
+          {% endif %}
+        </tfoot>
+      </table>
+      <p class="center muted" style="margin-top:8px;">Merci pour votre achat</p>
+    </div>
+  </div>
+</body>
+</html>

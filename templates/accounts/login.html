@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% load form_extras %}
+
+{% block content %}
+<div class="min-h-screen grid lg:grid-cols-2">
+  <!-- LEFT: Form Card -->
+  <div class="flex items-center justify-center p-6 lg:p-10">
+    <div class="w-full max-w-xl">
+      <!-- Brand -->
+      <div class="mb-8">
+        <div class="inline-flex items-center gap-2">
+          <div class="text-3xl font-extrabold text-brand-600 tracking-wide">Eca<span class="text-rose-400">◉</span>Ges</div>
+          <span class="px-2 py-1 text-xs rounded-lg bg-rose-50 text-brand-600 border border-rose-100">v1.0</span>
+        </div>
+      </div>
+
+      <!-- Glass Card -->
+      <div class="rounded-2xl bg-white/70 backdrop-blur-xl border border-slate-100 shadow-glass p-6 sm:p-8">
+        <h1 class="text-3xl font-extrabold tracking-tight">Connexion</h1>
+        <p class="mt-1 text-slate-500">Accédez à votre tableau de bord.</p>
+
+        {% if form.non_field_errors %}
+          <div class="mt-4 rounded-xl border border-red-200 bg-red-50 text-red-800 px-4 py-3">
+            {{ form.non_field_errors|join:", " }}
+          </div>
+        {% endif %}
+
+        <form method="post" class="mt-6 space-y-5" novalidate>
+          {% csrf_token %}
+
+          <!-- Role -->
+          <div>
+            <label for="id_role" class="block text-sm font-semibold mb-2">Sélectionner votre département</label>
+            <div class="relative">
+              {{ form.role|add_class:"appearance-none block w-full rounded-xl border border-slate-200 bg-white/90 px-3 py-3 pr-10 text-sm focus:outline-none focus:ring-4 focus:ring-brand-100 focus:border-brand-500" }}
+              <svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
+
+          <!-- Username (as select, full name only) -->
+          <div>
+            <label for="id_username" class="block text-sm font-semibold mb-2">Sélectionner votre nom d’utilisateur</label>
+            <div class="relative">
+              {{ form.username|add_class:"appearance-none block w-full rounded-xl border border-slate-200 bg-white/90 px-3 py-3 pr-10 text-sm focus:outline-none focus:ring-4 focus:ring-brand-100 focus:border-brand-500" }}
+              <svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
+
+          <!-- Password -->
+          <div>
+            <label for="id_password" class="block text-sm font-semibold mb-2">Mot de passe</label>
+            <div class="relative">
+              {{ form.password|add_class:"block w-full rounded-xl border border-slate-200 bg-white/90 px-3 py-3 pr-10 text-sm focus:outline-none focus:ring-4 focus:ring-brand-100 focus:border-brand-500" }}
+              <button type="button" id="togglePwd" class="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-slate-600" aria-label="Afficher/Masquer">
+                <svg id="eyeIcon" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-width="2" d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12Z" />
+                  <circle cx="12" cy="12" r="3" stroke-width="2"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Submit -->
+          <button class="w-full inline-flex items-center justify-center rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-semibold py-3 transition-shadow shadow-sm hover:shadow-md">
+            Connexion
+          </button>
+        </form>
+
+        <div class="mt-5 flex items-center justify-between text-xs text-slate-500">
+          <span>&copy; {{ now|date:"Y" }} EcaGes</span>
+          <a href="#" class="hover:text-brand-600">Besoin d’aide ?</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Welcome / Illustration -->
+  <div class="hidden lg:flex relative">
+    <div class="absolute inset-0 bg-gradient-to-br from-cream via-white to-cream"></div>
+    <div class="relative flex w-full items-center justify-center p-10">
+      <div class="max-w-md text-center">
+        <div class="inline-flex items-center justify-center rounded-2xl bg-white/80 backdrop-blur-xl border border-slate-100 px-6 py-3 shadow-glass">
+          <div class="text-4xl font-extrabold text-rose-400 tracking-wide">Eca<span class="text-brand-600">◉</span>Ges</div>
+        </div>
+        <div class="mt-10">
+          <svg viewBox="0 0 400 220" class="mx-auto w-72 h-44">
+            <rect x="20" y="40" width="60" height="140" rx="12" class="fill-rose-100"></rect>
+            <rect x="110" y="80" width="60" height="100" rx="12" class="fill-rose-200"></rect>
+            <rect x="200" y="110" width="60" height="70" rx="12" class="fill-rose-300"></rect>
+            <rect x="290" y="50" width="60" height="130" rx="12" class="fill-rose-400"></rect>
+            <path d="M 50 60 C 120 120 230 100 320 40" stroke="#7a1a1a" stroke-width="4" fill="none" />
+            <circle cx="50" cy="60" r="6" class="fill-rose-300"></circle>
+            <circle cx="200" cy="100" r="6" class="fill-rose-300"></circle>
+            <circle cx="320" cy="40" r="6" class="fill-rose-400"></circle>
+          </svg>
+        </div>
+        <h2 class="mt-6 text-2xl font-extrabold text-brand-600">Bienvenue sur EcaGes.</h2>
+        <p class="mt-2 text-slate-600">EcaGes est un outil de gestion qui vous facilite vos opérations.</p>
+        <div class="mt-8 text-xs font-extrabold text-slate-700">Version 1.0</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- JS: Role→Users (full name only) + Password toggle -->
+<script>
+(function(){
+  const roleSelect = document.getElementById("id_role");
+  const usernameField = document.getElementById("id_username");
+  const pwd = document.getElementById("id_password");
+  const toggle = document.getElementById("togglePwd");
+
+  // Ensure username is a real <select>
+  function ensureSelect(el){
+    if(!el) return null;
+    if(el.tagName.toLowerCase() === 'select') return el;
+    const s = document.createElement('select');
+    for (const {name, value} of [{name:'name', value:el.name}, {name:'id', value:el.id}, {name:'class', value:el.className||''}]) {
+      if(value) (name==='class') ? s.className = value : s.setAttribute(name, value);
+    }
+    el.replaceWith(s);
+    return s;
+  }
+  const userSelect = ensureSelect(usernameField);
+
+  function setUserOptions(items){
+    if(!userSelect) return;
+    userSelect.innerHTML = "";
+    const ph = document.createElement("option");
+    ph.value = ""; ph.textContent = "— Sélectionnez l'utilisateur —";
+    userSelect.appendChild(ph);
+    (items || []).forEach(o=>{
+      const op = document.createElement("option");
+      op.value = o.username;                 // form submits username
+      op.textContent = o.display;            // show ONLY full name
+      userSelect.appendChild(op);
+    });
+  }
+
+  async function loadUsers(role){
+    if(!role){ setUserOptions([]); return; }
+    try{
+      const r = await fetch(`/accounts/api/users-by-role/?role=${encodeURIComponent(role)}`);
+      if(!r.ok) throw new Error("HTTP " + r.status);
+      const data = await r.json();
+      setUserOptions(data);                  // no hint/count shown
+    }catch(e){
+      console.error(e);
+      setUserOptions([]);
+    }
+  }
+
+  roleSelect?.addEventListener("change", e => loadUsers(e.target.value));
+  if(roleSelect?.value){ loadUsers(roleSelect.value); } else { setUserOptions([]); }
+
+  // Password toggle
+  toggle?.addEventListener("click", ()=>{
+    if(!pwd) return;
+    const isPwd = pwd.type === "password";
+    pwd.type = isPwd ? "text" : "password";
+    const eye = document.getElementById("eyeIcon");
+    if(eye){
+      eye.innerHTML = isPwd
+        ? '<path stroke-linecap="round" stroke-width="2" d="M3 3l18 18M12 5c7 0 11 7 11 7a22.36 22.36 0 0 1-6.22 6.22M9.9 9.9A3 3 0 0 1 12 9a3 3 0 0 1 3 3c0 .51-.13.99-.36 1.4" />'
+        : '<path stroke-linecap="round" stroke-width="2" d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12Z" /><circle cx="12" cy="12" r="3" stroke-width="2"/>';
+    }
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,369 @@
+{% extends "layouts/base_cashier.html" %}
+
+{% block title %}Caisse — Tableau de bord | ECAGES{% endblock %}
+{% block nav_dashboard_active %}active{% endblock %}
+
+{% block extra_css %}
+  :root {
+    /* inherit brand from base */
+    --ink: #0f172a;
+    --muted: #64748b;
+    --ring: #e5e7eb;
+    --success: #16a34a;
+    --danger: #dc2626;
+    --bg: #f8fafc;
+  }
+  body { background: var(--bg); }
+  .dashboard-container {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Section: controls */
+  .controls-card {
+    display:flex; align-items:center; gap:1rem; flex-wrap:wrap;
+    background:#fff; border:1px solid var(--ring); border-radius:14px;
+    padding: .9rem 1.1rem; box-shadow: 0 1px 4px rgba(0,0,0,.04);
+    margin-bottom: 1rem;
+  }
+  .controls-title { font-weight:900; color:var(--ink); }
+  .search-group { margin-left:auto; display:flex; align-items:center; gap:.6rem; }
+  .search-group label { color:var(--muted); font-weight:600; }
+  .search-group select, .search-group input {
+    border:1px solid var(--ring); border-radius:10px; padding:.45rem .8rem;
+    font-weight:600; background:#f9fafb; color:var(--ink); outline:none;
+  }
+  .search-group select:focus, .search-group input:focus { box-shadow: 0 0 0 4px rgba(88,7,6,.10); border-color:#580706; }
+
+  /* Feedback UI */
+  .empty { display:flex; align-items:center; justify-content:center; padding:1.2rem; color:var(--muted); }
+  .skeleton-row td{ position:relative; }
+  .skeleton{ display:block; height:12px; width:100%; background:linear-gradient(90deg,#f3f4f6, #e5e7eb, #f3f4f6); background-size:200% 100%; animation:shimmer 1.2s infinite linear; border-radius:8px; }
+  @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+  .btn:focus, .input:focus, select:focus { outline: none; box-shadow: 0 0 0 3px rgba(88,7,6,.18); }
+
+  /* Table */
+  .table-wrap { background:#fff; border:1px solid var(--ring); border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.04); overflow:auto; margin-bottom:14px; }
+  table.dashboard-table { width:100%; border-collapse:separate; border-spacing:0; min-width:900px; }
+  table.dashboard-table th, table.dashboard-table td { padding:.8rem 1rem; border-bottom:1px solid #f3f4f6; text-align:left; }
+  table.dashboard-table th { background: rgba(88,7,6,.035); color: var(--muted); font-weight:800; position:sticky; top:0; z-index:1; }
+  table.dashboard-table tbody tr:hover td { background:#f6f7fb; }
+  .badge { display:inline-block; padding:.25rem .6rem; border-radius:999px; font-size:.82rem; font-weight:800; background: rgba(88,7,6,.06); color:var(--ink); border:1px solid rgba(88,7,6,.18); }
+
+  /* Pager */
+  .pager { display:flex; align-items:center; justify-content:flex-end; gap:10px; }
+  .pager .btn { background:#580706; color:#fff; border:0; border-radius:10px; padding:.45rem 1rem; font-weight:800; }
+  .pager .btn[disabled] { background:#e5e7eb; color:#9ca3af; }
+  .pager .btn { min-width: 110px; }
+
+  /* Modal */
+  .modal { display:none; position:fixed; inset:0; z-index:100; background:rgba(15,23,42,.25); align-items:center; justify-content:center; }
+  .modal.show { display:flex; }
+  .sheet { background:#fff; border-radius:16px; border:1px solid var(--ring); box-shadow:0 30px 60px rgba(2,8,23,.2); width:min(95vw,760px); overflow:hidden; border-top:6px solid #580706; }
+  .hd { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:1px solid var(--ring); background: linear-gradient(135deg, #6d0a0a, #580706); color:#fff; }
+  .hd .title { color:#fff; }
+  .hd .btn { background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.35); color:#fff; border-radius:10px; padding:.45rem .7rem; font-weight:800; }
+  .hd .btn:hover { background: rgba(255,255,255,.22); }
+  .bd { padding:16px; }
+  /* Modal lines table */
+  table.lines{ width:100%; border-collapse:separate; border-spacing:0; font-size:.95rem; }
+  table.lines thead th{ position:sticky; top:0; background:#f9fafb; z-index:1; text-align:left; font-weight:800; color:#64748b; border-bottom:1px solid #e5e7eb; padding:.7rem .9rem; }
+  table.lines tbody td{ border-bottom:1px solid #f3f4f6; padding:.7rem .9rem; }
+  table.lines tbody tr:hover td{ background:#f6f7fb; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+  .field { display:flex; flex-direction:column; gap:.35rem; }
+  .label { color:var(--muted); font-weight:700; font-size:.9rem; }
+  .input { border:1px solid var(--ring); border-radius:10px; padding:.55rem .75rem; font-weight:700; background:#f9fafb; color:var(--ink); outline:none; }
+  .input:focus { box-shadow:0 0 0 4px rgba(88,7,6,.10); border-color:#580706; }
+  .actions { display:flex; gap:.6rem; justify-content:flex-end; flex-wrap:wrap; }
+  .btn-outline { background:#fff; color:#580706; border:1px solid #580706; border-radius:10px; padding:.5rem .9rem; font-weight:800; }
+  .btn-outline:hover { background:#fff3f3; }
+  .btn-red { background:#dc2626; color:#fff; border:0; border-radius:10px; padding:.5rem .9rem; font-weight:800; }
+  .btn-green { background:#16a34a; color:#fff; border:0; border-radius:10px; padding:.5rem .9rem; font-weight:800; }
+  .right { text-align:right; }
+  @media (max-width: 1000px){ .dashboard-container{padding: 0;} .grid{grid-template-columns:1fr;} table.dashboard-table{min-width:0;} }
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+
+  <!-- CONTROLS -->
+  <div class="controls-card">
+    <div class="controls-title">Encaissements (aujourd’hui)</div>
+    <div class="search-group">
+      <label for="pageSize">Afficher</label>
+      <select id="pageSize">
+        <option value="10">10</option>
+        <option value="25">25</option>
+        <option value="50" selected>50</option>
+        <option value="100">100</option>
+      </select>
+      <label>entrées</label>
+      <label for="q" style="margin-left:.6rem;">Recherche:</label>
+      <input id="q" placeholder="Numéro, client…" aria-label="Recherche encaissements" />
+    </div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="table-wrap">
+    <table class="dashboard-table">
+      <thead>
+        <tr>
+          <th>N°</th>
+          <th>Client</th>
+          <th>Vendeur</th>
+          <th>Total</th>
+          <th>Reçue le</th>
+          <th>Statut</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="rows">
+        <tr class="skeleton-row"><td colspan="7"><span class="skeleton"></span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="pager">
+    <span class="muted" style="font-size:.98rem;">Page <span id="cPage">1</span> / <span id="cPages">1</span></span>
+    <button id="cPrev" class="btn">Précédent</button>
+    <button id="cNext" class="btn">Suivant</button>
+  </div>
+</div>
+
+<!-- Modal: detail / print only -->
+<div id="saleModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="saleTitle">
+  <div class="sheet">
+    <div class="hd">
+      <div class="title" id="saleTitle">Détail de la vente · <span id="dv-number" class="muted" style="font-weight:800"></span></div>
+      <button class="btn" data-close="#saleModal">Fermer ✕</button>
+    </div>
+    <div class="bd">
+      <div class="grid">
+        <div><div class="muted">Client</div><div id="dv-client" class="title"></div></div>
+        <div><div class="muted">Vendeur</div><div id="dv-seller" class="title"></div></div>
+      </div>
+      <div style="margin-top:10px; overflow:auto;">
+        <table class="lines" style="width:100%; min-width:560px;">
+          <thead><tr><th>Produit</th><th>Qté</th><th>PU</th><th class="right">Total</th></tr></thead>
+          <tbody id="dv-lines"></tbody>
+        </table>
+      </div>
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:14px; margin-top:12px; flex-wrap:wrap;">
+        <div class="title">Total: <span id="dv-total" style="color:#580706">0</span></div>
+        <div class="field" style="min-width:260px;">
+          <label class="label" for="dv-received">Montant reçu (FCFA)</label>
+          <input id="dv-received" class="input" type="number" min="0" step="1" placeholder="Saisir le montant" inputmode="numeric">
+        </div>
+        <div class="field" style="min-width:220px;">
+          <label class="label" for="dv-change">Monnaie à rendre</label>
+          <input id="dv-change" class="input" type="text" readonly>
+        </div>
+      </div>
+      <div class="actions" style="margin-top:12px;">
+        <button id="dv-cancel" class="btn-red" title="Annuler la vente">✖ Annuler</button>
+        <button id="dv-complete" class="btn-outline" title="Valider &amp; imprimer" disabled>✓ Valider & Imprimer</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', ()=>{
+  const UX = window.ECAGES || {};
+  const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
+  const rows=$('#rows'), q=$('#q');
+  const pageSizeSel=$('#pageSize');
+  const cPageEl=$('#cPage'), cPagesEl=$('#cPages');
+  const prevBtn=$('#cPrev'), nextBtn=$('#cNext');
+  function f(n){return Number(n).toLocaleString('fr-FR');}
+  function debounce(fn,ms=200){let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms);};}
+
+  const CSRF=(document.cookie.match('(^|;)\\s*csrftoken\\s*=\\s*([^;]+)')||[]).pop()||'';
+
+  // Data
+  let cache=[]; let page=1; let PAGE_SIZE=parseInt(pageSizeSel.value,10)||50;
+
+  let lastSig = '';
+  let timer = null;
+  let delayMs = 15000; // 15s refresh
+  const MAX_DELAY = 60000; // backoff cap 60s
+  function signature(list){
+    try{ return (list||[]).map(x=>`${x.id}|${x.total}|${x.status||''}|${x.created||''}`).join('#'); }catch(_){ return '' }
+  }
+
+  async function load(silent=false){
+    try{
+      if(!silent){ UX.startProgress && UX.startProgress(); UX.showLoader && UX.showLoader(true); }
+      const r=await fetch("{% url 'sales:sales_api_cashier_pending' %}", {cache:'no-store'});
+      const data = await r.json();
+      const arr = Array.isArray(data) ? data : [];
+      arr.sort((a,b)=>{
+        const da = new Date(a.created||0).getTime();
+        const db = new Date(b.created||0).getTime();
+        return db - da;
+      });
+      const sig = signature(arr);
+      if(sig !== lastSig){
+        cache = arr;
+        lastSig = sig;
+        render();
+      }
+      // success: reset backoff
+      delayMs = 15000;
+    } catch(e){
+      if(!silent){ rows.innerHTML = '<tr><td colspan="7" class="empty">Impossible de charger les encaissements.</td></tr>'; }
+      // backoff on errors
+      delayMs = Math.min(Math.round(delayMs * 1.5), MAX_DELAY);
+    } finally {
+      if(!silent){ UX.showLoader && UX.showLoader(false); UX.doneProgress && UX.doneProgress(); }
+    }
+  }
+
+  function getFiltered(){
+    const term=(q.value||'').toLowerCase();
+    return cache.filter(x => (x.number+' '+x.customer+' '+x.seller).toLowerCase().includes(term));
+  }
+
+  function render(){
+    const items=getFiltered();
+    const totalPages=Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+    if(page>totalPages) page=totalPages;
+    const start=(page-1)*PAGE_SIZE, end=start+PAGE_SIZE;
+    const slice=items.slice(start,end);
+    rows.innerHTML='';
+    if(!slice.length){
+      const tr=document.createElement('tr');
+      tr.innerHTML='<td colspan="7" class="empty">Aucun encaissement.</td>';
+      rows.appendChild(tr);
+    } else {
+      slice.forEach(x=>{
+        const tr=document.createElement('tr');
+        const statusLabel = (function(s){
+          if (s === 'awaiting_cashier' || !s) return 'En attente';
+          if (s === 'approved') return 'Validée';
+          if (s === 'cancelled') return 'Annulée';
+          if (s === 'rejected') return 'Rejetée';
+          if (s === 'draft') return 'Brouillon';
+          return s;
+        })(x.status);
+        tr.innerHTML=`<td><strong>${x.number}</strong></td>
+                       <td>${x.customer}</td>
+                       <td>${x.seller}</td>
+                       <td><strong>${f(x.total)}</strong></td>
+                       <td class="muted">${x.created}</td>
+                       <td><span class="badge">${statusLabel}</span></td>
+                       <td><button class="btn" style="background:#fff;border:1px solid var(--ring);border-radius:10px;" data-id="${x.id}">Voir</button></td>`;
+        tr.querySelector('button').onclick=()=>openDetail(x.id);
+        tr.style.cursor='pointer';
+        tr.onclick=(e)=>{ if(e.target.tagName!=='BUTTON') openDetail(x.id); };
+        rows.appendChild(tr);
+      });
+    }
+    cPageEl.textContent=String(page); cPagesEl.textContent=String(totalPages);
+    prevBtn.disabled=page<=1; nextBtn.disabled=page>=totalPages;
+  }
+
+  prevBtn.addEventListener('click', ()=>{ if(page>1){ page--; render(); }});
+  nextBtn.addEventListener('click', ()=>{ const totalPages=Math.max(1, Math.ceil(getFiltered().length/PAGE_SIZE)); if(page<totalPages){ page++; render(); }});
+  q.addEventListener('input', debounce(()=>{ page=1; render(); }, 150));
+  pageSizeSel.addEventListener('change', ()=>{ PAGE_SIZE=parseInt(pageSizeSel.value,10)||50; page=1; render(); });
+
+  // Modal (print-only)
+  function openModal(id){document.querySelector(id).classList.add('show');}
+  function closeModal(id){document.querySelector(id).classList.remove('show');}
+  document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>closeModal(b.dataset.close));
+  document.getElementById('saleModal').addEventListener('click', (e)=>{ if(e.target.id==='saleModal') closeModal('#saleModal'); });
+  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeModal('#saleModal'); });
+
+  async function openDetail(id){
+    UX.startProgress && UX.startProgress(); UX.showLoader && UX.showLoader(true);
+    const r=await fetch("{% url 'sales:sales_api_cashier_sale_detail' 0 %}".replace('0', id));
+    const s=await r.json();
+
+    document.getElementById('dv-number').textContent=s.number;
+    document.getElementById('dv-client').textContent=s.customer;
+    document.getElementById('dv-seller').textContent=s.seller;
+    const totalNum = Number(s.total || 0);
+    document.getElementById('dv-total').textContent=`FCFA ${f(totalNum)}`;
+
+    const tb=document.getElementById('dv-lines'); tb.innerHTML='';
+    s.items.forEach(it=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${it.name}</td><td>${it.qty}</td><td>${f(it.unit)}</td><td class="right">${f(it.total)}</td>`; tb.appendChild(tr); });
+
+    const receivedInput=document.getElementById('dv-received');
+    const changeInput=document.getElementById('dv-change');
+    const cancelBtn=document.getElementById('dv-cancel');
+    const completeBtn=document.getElementById('dv-complete');
+
+    function recalc(){
+      const rcv = Number(receivedInput.value || 0);
+      const change = rcv - totalNum;
+      changeInput.value = change >= 0 ? `FCFA ${f(change)}` : 'Insuffisant';
+      const canConfirm = rcv >= totalNum;
+      completeBtn.disabled = !canConfirm;
+      if (canConfirm){ completeBtn.classList.remove('btn-outline'); completeBtn.classList.add('btn-green'); }
+      else { completeBtn.classList.remove('btn-green'); completeBtn.classList.add('btn-outline'); }
+    }
+
+    receivedInput.value=''; changeInput.value='';
+    receivedInput.oninput=recalc;
+    receivedInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter' && !completeBtn.disabled){ e.preventDefault(); completeBtn.click(); }});
+    recalc();
+
+    cancelBtn.onclick = async ()=>{
+      if(!confirm('Annuler cette vente ?')) return;
+      try{
+        UX.startProgress && UX.startProgress(); UX.showLoader && UX.showLoader(true);
+        const resp = await fetch("{% url 'sales:sales_api_cashier_cancel' 0 %}".replace('0', s.id), { method:'POST', headers:{'X-CSRFToken': CSRF } });
+        const res = await resp.json();
+        if(res.ok){ await load(true); closeModal('#saleModal'); alert('Vente annulée'); }
+        else { alert(res.error || 'Erreur.'); }
+      }catch(err){ alert('Erreur réseau.'); }
+      finally { UX.showLoader && UX.showLoader(false); UX.doneProgress && UX.doneProgress(); }
+    };
+
+    completeBtn.onclick = async ()=>{
+      if(completeBtn.disabled) return;
+      const val = Number(receivedInput.value || 0);
+      try{
+        UX.startProgress && UX.startProgress(); UX.showLoader && UX.showLoader(true);
+        const fd = new FormData(); fd.append('amount', String(val));
+        const resp = await fetch("{% url 'sales:sales_api_cashier_validate' 0 %}".replace('0', s.id), { method:'POST', body: fd, headers:{'X-CSRFToken': CSRF } });
+        const res = await resp.json();
+        if(res.ok){
+          // open simple print view
+          const linesHtml = Array.from(document.querySelectorAll('#dv-lines tr')).map(tr=>`<tr>${tr.innerHTML}</tr>`).join('');
+          const w = window.open('', '_blank');
+          w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Reçu ${s.number}</title><style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;padding:16px;} h2{margin:0 0 6px;} table{width:100%;border-collapse:collapse;margin-top:10px} th,td{border-bottom:1px solid #eee;padding:6px;text-align:left} .right{text-align:right} .muted{color:#64748b}</style></head><body><h2>ECAGES — Reçu de paiement</h2><div class="muted">${new Date().toLocaleString('fr-FR')}</div><p><strong>Vente:</strong> ${s.number}<br><strong>Client:</strong> ${s.customer}<br><strong>Vendeur:</strong> ${s.seller}</p><table><thead><tr><th>Produit</th><th>Qté</th><th>PU</th><th class="right">Total</th></tr></thead><tbody>${linesHtml}</tbody></table><h3 class="right">Total: FCFA ${f(totalNum)}</h3></body></html>`);
+          w.document.close(); w.focus(); w.print(); w.close();
+          await load(true);
+          closeModal('#saleModal');
+          alert('Vente validée');
+        } else { alert(res.error || 'Erreur.'); }
+      }catch(err){ alert('Erreur réseau.'); }
+      finally { UX.showLoader && UX.showLoader(false); UX.doneProgress && UX.doneProgress(); }
+    };
+
+    UX.showLoader && UX.showLoader(false); UX.doneProgress && UX.doneProgress();
+    openModal('#saleModal');
+  }
+
+  function schedule(){
+    clearTimeout(timer);
+    timer = setTimeout(async ()=>{ await load(true); schedule(); }, delayMs);
+  }
+  document.addEventListener('visibilitychange', ()=>{
+    // pause when hidden, resume on focus with immediate refresh
+    if(document.hidden){ clearTimeout(timer); }
+    else { load(true); schedule(); }
+  });
+
+  (async()=>{ try{ await load(); } catch(e){ alert('Impossible de charger les encaissements.'); } })();
+  schedule();
+});
+</script>
+{% endblock %}

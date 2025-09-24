@@ -1,0 +1,58 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+ecages_env/
+ENV/
+
+# Django stuff
+*.log
+staticfiles/
+media/
+local_settings.py
+.env
+.venv
+
+# SQLite database files
+*.sqlite3
+*.sqlite
+db.sqlite3
+db.backup.before_reload.sqlite3
+
+# VSCode/PyCharm/OS junk
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Python tooling
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+__pypackages__/
+
+# Node / front-end caches
+node_modules/
+
+# Project-specific generated assets
+static/barcodes/
+
+# Cursor and editor backups
+.cursorignore
+*.swp
+*~

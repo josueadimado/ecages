@@ -1,0 +1,96 @@
+{% extends "layouts/base_sales.html" %}
+{% block content %}
+<style>
+  :root{ --ring:#e5e7eb; --muted:#64748b; --brand:#580706; }
+  .content{ padding:16px; }
+  .card{ background:#fff; border:1px solid var(--ring); border-radius:14px; box-shadow:0 10px 30px rgba(2,8,23,.06); margin-bottom:14px; }
+  .row{ display:flex; align-items:center; justify-content:space-between; gap:.6rem; padding:12px 16px; }
+  .title{ font-weight:900; }
+  .muted{ color:var(--muted); }
+  .btn{ border:1px solid var(--ring); background:#fff; border-radius:12px; padding:.55rem .9rem; font-weight:800; }
+  .btn-brand{ background:var(--brand); color:#fff; border-color:transparent; }
+  .table{ width:100%; border-collapse:separate; border-spacing:0; }
+  .table th{ text-align:left; padding:.55rem .7rem; font-size:.8rem; color:var(--muted); border-bottom:1px solid var(--ring); }
+  .table td{ padding:.6rem .7rem; border-bottom:1px solid #f3f4f6; }
+  .grid{ display:grid; gap:.8rem; }
+  .g-2{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+  @media (max-width:900px){ .g-2{ grid-template-columns:1fr; } }
+</style>
+
+<div class="content">
+  <div class="card">
+    <div class="row"><div class="title">Gérant — {{ salespoint.name }}</div>
+      <div class="row" style="gap:.5rem; padding:0;">
+        <button type="button" class="btn btn-brand" onclick="window.__salesOpen && window.__salesOpen.openPieces && window.__salesOpen.openPieces()">Vente Pièces</button>
+        <button type="button" class="btn" onclick="window.__salesOpen && window.__salesOpen.openMoto && window.__salesOpen.openMoto()">Vente Moto</button>
+        <button type="button" class="btn" style="border-color:#fecaca; color:#991b1b;" onclick="window.__salesOpen && window.__salesOpen.openCancel && window.__salesOpen.openCancel()">Annulation</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid g-2">
+    <div class="card">
+      <div class="row"><div class="title">Alertes stock</div></div>
+      <div style="padding:0 16px 12px 16px; overflow:auto;">
+        <table class="table">
+          <thead><tr><th>Produit</th><th>Marque</th><th>Dispo.</th><th>Alerte</th></tr></thead>
+          <tbody>
+            {% for r in low_stock %}
+            <tr><td>{{ r.name }}</td><td>{{ r.brand }}</td><td>{{ r.remaining_qty }}</td><td>{{ r.alert_qty }}</td></tr>
+            {% empty %}
+            <tr><td colspan="4" class="muted">Aucun article en alerte.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row"><div class="title">Transferts entrants (14 jours)</div></div>
+      <div style="padding:0 16px 12px 16px; overflow:auto;">
+        <table class="table">
+          <thead><tr><th>Date</th><th>Produit</th><th>Qté</th><th>De</th></tr></thead>
+          <tbody>
+            {% for t in in_transfers %}
+            <tr>
+              <td>{{ t.created_at|date:"d/m/Y H:i" }}</td>
+              <td>{{ t.product.name }}</td>
+              <td>{{ t.quantity }}</td>
+              <td>{{ t.from_salespoint.name|default:"—" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="muted">Aucun transfert récent.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row"><div class="title">Demandes d’annulation en attente (7 jours)</div></div>
+    <div style="padding:0 16px 12px 16px; overflow:auto;">
+      <table class="table">
+        <thead><tr><th>Reçu</th><th>Client</th><th>Lignes</th><th>Demandé par</th><th>Date</th></tr></thead>
+        <tbody>
+          {% for req in pending_cancels %}
+          <tr>
+            <td>{{ req.sale.number }}</td>
+            <td>{{ req.sale.customer_name }}</td>
+            <td>{{ req.lines.all|length }}</td>
+            <td>{{ req.requested_by.get_full_name|default:req.requested_by.username }}</td>
+            <td>{{ req.created_at|date:"d/m/Y H:i" }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="muted">Aucune demande.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% include "sales/_sales_actions.html" %}
+</div>
+{% endblock %}
+
+

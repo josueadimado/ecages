@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>Bon d'approvisionnement — {% if req.reference %}{{ req.reference }}{% else %}REQ-{{ req.id }}{% endif %}</title>
+  <style>
+    body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji"; margin:24px;}
+    h1{font-size:18px; margin:0 0 6px 0}
+    .muted{color:#6b7280}
+    table{width:100%; border-collapse:collapse; margin-top:16px}
+    th,td{border:1px solid #e5e7eb; padding:8px; text-align:left}
+    th{background:#f9fafb}
+    .right{text-align:right}
+    .header{display:flex; justify-content:space-between; align-items:flex-start}
+    .small{font-size:12px}
+    .print{margin-top:16px}
+    @media print{ .print{ display:none !important; } }
+  </style>
+  <script>function doPrint(){ window.print(); }</script>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h1>Bon d'approvisionnement</h1>
+      <div class="muted small">Référence: <strong>{% if req.reference %}{{ req.reference }}{% else %}REQ-{{ req.id }}{% endif %}</strong></div>
+      <div class="muted small">Point de vente: <strong>{{ req.salespoint.name }}</strong></div>
+      <div class="muted small">Demandé par: <strong>{{ req.requested_by.get_full_name|default:req.requested_by.username }}</strong></div>
+      <div class="muted small">Date: <strong>{{ req.created_at|date:"d/m/Y H:i" }}</strong></div>
+      <div class="muted small">Statut: <strong>{{ req.status }}</strong></div>
+    </div>
+    <button class="print" onclick="doPrint()">Imprimer</button>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Produit</th>
+        <th>Marque</th>
+        <th class="right">Qté envoyée</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ln in lines %}
+      <tr>
+        <td>{{ ln.product.name }}</td>
+        <td>{% if ln.product.brand_id %}{{ ln.product.brand.name }}{% else %}{% endif %}</td>
+        <td class="right">{{ ln.quantity_approved|default:ln.quantity_requested|default:ln.quantity|default:0 }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="3" class="muted">Aucune ligne.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div style="margin-top:28px; display:grid; grid-template-columns:repeat(3,1fr); gap:16px;">
+    <div>
+      <div class="muted small">Directeur Commercial</div>
+      <div style="height:60px; border-bottom:1px solid #e5e7eb"></div>
+      <div class="small muted">Nom & Signature</div>
+    </div>
+    <div>
+      <div class="muted small">Magasinier (Entrepôt)</div>
+      <div style="height:60px; border-bottom:1px solid #e5e7eb"></div>
+      <div class="small muted">Nom & Signature</div>
+    </div>
+    <div>
+      <div class="muted small">Gérant du point de vente</div>
+      <div style="height:60px; border-bottom:1px solid #e5e7eb"></div>
+      <div class="small muted">Nom & Signature</div>
+    </div>
+  </div>
+</body>
+</html>
+
+
+

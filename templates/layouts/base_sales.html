@@ -1,0 +1,475 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}Ventes — ECAGES{% endblock %}</title>
+  <!-- Tailwind (Play CDN) for rapid, clean UI without build step -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: { colors: { brand: '#580706' } } } }
+  </script>
+  <!-- Inter font for nicer typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      /* Match cashier palette/metrics */
+      --bg: #f7f7f8;
+      --surface: #ffffff;
+      --ink: #0f172a;
+      --muted: #6b7280;
+      --ring: #e5e7eb;
+      --line: #edf0f2;
+      --brand: #580706;
+      --brand-rgb: 88, 7, 6;
+      --shadow: 0 8px 24px rgba(2, 8, 23, .06);
+      --radius: 12px;
+      --sbw: 240px;
+      --sbw-collapsed: 68px;
+      --gutter: 28px;
+      --font: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    }
+
+    html, body { height:100%; margin:0; font-family: var(--font); background: var(--bg); color: var(--ink); }
+
+    /* Topbar */
+    .topbar { position: sticky; top: 0; z-index: 40; background: var(--surface); border-bottom: 1px solid var(--line); }
+    .brand { display:flex; align-items:center; gap:10px; font-weight: 800; letter-spacing:.2px; margin-left: var(--gutter); }
+    .brand .word { font-size: 1.05rem; }
+    .toggle { border:1px solid var(--ring); background: var(--surface); border-radius: 10px; padding: 6px 8px; cursor: pointer; }
+    .toggle:hover { background: #fafafa; }
+    .profile { display:flex; align-items:center; gap:10px; }
+    .avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--brand); border:1px solid var(--ring); display:grid; place-items:center; font-weight:800; color: #fff; box-shadow: 0 2px 6px rgba(88,7,6,0.5); }
+    .who .name { font-weight: 800; font-size: .95rem; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .logout { border:none; border-radius: 10px; padding: 6px 10px; background: var(--brand); color: #fff; font-weight: 700; cursor: pointer; margin-right: 28px; }
+    .logout:hover { background: #460504; }
+
+    /* Layout */
+    .wrap { display:flex; min-height: calc(100vh - 56px); }
+
+    /* Sidebar */
+    .sidebar { position: sticky; top: 56px; height: calc(100vh - 56px); width: var(--sbw); background: var(--surface); border-right:1px solid var(--line); transition: width .2s ease, transform .2s ease; }
+    .sidebar.collapsed { width: var(--sbw-collapsed); }
+    .sb-inner { padding: 12px var(--gutter); display:flex; flex-direction: column; gap: 6px; }
+    .sb-item { display:flex; align-items:center; gap:10px; padding: 10px 12px; border-radius: 10px; text-decoration:none; color: var(--ink); font-weight: 800; border:1px solid var(--ring); background: #fff; }
+    .sb-item:hover { background:#f5f6f8; }
+    .sb-icon { width: 18px; height: 18px; display:grid; place-items:center; }
+    .sb-label { white-space: normal; word-break: break-word; line-height: 1.15; }
+    .sidebar.collapsed .sb-label { display:none; }
+    /* Collapsed sidebar: make items square icon buttons and fix inner padding */
+    .sidebar.collapsed .sb-inner { padding-left: 10px; padding-right: 10px; gap: 10px; }
+    .sidebar.collapsed .sb-item { 
+      width: 44px; 
+      height: 44px; 
+      padding: 0; 
+      gap: 0; 
+      justify-content: center; 
+      border-radius: 12px; 
+    }
+    .sidebar.collapsed .sb-icon { width: 22px; height: 22px; }
+    .sidebar.collapsed .sb-item svg { width: 22px; height: 22px; }
+
+    /* Main */
+    .content { flex:1; min-width:0; }
+    .content-pad { max-width: 1280px; margin: 0 auto; padding: 18px 16px 28px; }
+
+    /* Marquee ribbon (same as cashier) */
+    .ribbon { background: linear-gradient(180deg, #6e0a0a, var(--brand)); color:#fff; border-radius:18px; padding:24px 32px; text-align:center; font-weight:900; letter-spacing:.3px; box-shadow: var(--shadow); border: 1px solid rgba(0,0,0,.05); overflow:hidden; margin-bottom: 12px; }
+    .marquee { position: relative; width: 100%; overflow: hidden; }
+    .marquee span { display:inline-block; padding-left:100%; white-space:nowrap; animation: scrollLeft 18s linear infinite; font-size: 1.5rem; }
+    @keyframes scrollLeft { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
+
+    /* Loaders */
+    .progressbar { position: fixed; top: 0; left: 0; height: 3px; width: 0; background: linear-gradient(90deg, #a21d1d, var(--brand)); box-shadow: 0 1px 6px rgba(88,7,6,.4); z-index: 9999; transition: width .8s ease; }
+    .progressbar.show { width: 60%; }
+    .progressbar.done { width: 100%; }
+    .overlay-loader { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(255,255,255,.55); backdrop-filter: blur(2px); z-index: 9998; opacity: 0; transition: opacity .25s ease; }
+    .overlay-loader.show { display: flex; opacity: 1; }
+    .spinner { width: 54px; height: 54px; border: 4px solid #e5e7eb; border-top-color: var(--brand); border-radius: 50%; animation: spin 1.4s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Toasts */
+    .toasts{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;gap:.5rem;z-index:70}
+    .toast{background:#fff;border:1px solid var(--ring);border-left:4px solid #0ea5e9;border-radius:10px;padding:.6rem .8rem;min-width:260px;box-shadow:0 8px 24px rgba(0,0,0,.08)}
+    .toast.good{border-left-color:#16a34a}.toast.bad{border-left-color:#dc2626}
+
+    /* Responsive */
+    @media (max-width: 720px) {
+      .sidebar { position: fixed; top: 56px; left: 0; transform: translateX(-100%); width: var(--sbw); box-shadow: var(--shadow); }
+      .sidebar.show { transform: translateX(0); }
+      .content-pad { padding: 14px 12px 24px; }
+      .sb-inner { padding-left: var(--gutter); padding-right: var(--gutter); }
+    }
+
+  </style>
+  {% block extra_css %}{% endblock %}
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <!-- Global loaders -->
+  <div id="topProgress" class="progressbar" aria-hidden="true"></div>
+  <div id="overlayLoader" class="overlay-loader" aria-live="polite" aria-busy="true">
+    <div class="spinner" role="status" aria-label="Chargement"></div>
+  </div>
+
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="topbar-inner w-full h-14 flex items-center justify-between gap-3">
+      <div class="brand">
+        <button id="btnSidebar" class="toggle" title="Menu">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h16" stroke="#111827" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <div class="word text-xl font-extrabold tracking-tight">
+          <span class="text-[#0f172a]">Eca</span><span class="text-[#580706]">Ges</span>
+        </div>
+      </div>
+      <div class="profile">
+        <div class="avatar ring-1 ring-white/40 shadow">{{ request.user.get_short_name|default:request.user.username|first|upper }}</div>
+        <div class="who"><div class="name">{{ request.user.get_full_name|default:request.user.username }}</div></div>
+        <!-- Notifications bell -->
+        <div id="notifWrap" class="relative">
+          <button id="btnNotif" class="toggle" title="Notifications" aria-label="Notifications">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 10-12 0v3.2c0 .53-.21 1.04-.59 1.41L4 17h5m2 4a2 2 0 002-2H9a2 2 0 002 2z" stroke="#111827" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span id="notifDot" style="display:none; position:absolute; top:-2px; right:-2px; width:9px; height:9px; background:#dc2626; border-radius:999px"></span>
+          </button>
+          <div id="notifBox" class="absolute right-0 mt-2 w-80 bg-white border border-[var(--ring)] rounded-xl shadow-xl" style="display:none;">
+            <div class="flex items-center justify-between px-3 py-2 border-b border-[var(--ring)]">
+              <div class="font-extrabold text-sm">Notifications</div>
+              <button id="notifMarkAll" class="text-xs font-bold px-2 py-1 rounded-lg border border-[var(--ring)] hover:bg-gray-50">Tout marquer comme lu</button>
+            </div>
+            <div id="notifItems" class="flex flex-col gap-2 max-h-80 overflow-auto p-2"></div>
+          </div>
+        </div>
+        <a class="logout inline-flex items-center justify-center gap-2 border border-[#580706] bg-white hover:bg-[#580706] hover:text-white text-[#580706] font-bold h-9 px-4 rounded-lg shadow-sm transition" href="{% url 'logout' %}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 17l5-5-5-5M20 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M13 5V4a2 2 0 00-2-2H5a2 2 0 00-2 2v16a2 2 0 002 2h6a2 2 0 002-2v-1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Déconnexion
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <!-- Sidebar: role-aware. Salesperson keeps sales links; Manager sees Dashboard-only (for now) -->
+    <aside id="sidebar" class="sidebar">
+      <div class="sb-inner">
+        {% with role=request.user.role|default:''|lower %}
+        {% if role == 'sales' %}
+        <a href="#" id="menuPieces" class="sb-item">
+          <span class="sb-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7" stroke="#475569" stroke-width="2" stroke-linejoin="round"/></svg>
+          </span>
+          <span class="sb-label">Vente de Pièces</span>
+        </a>
+        <a href="#" id="menuMotos" class="sb-item">
+          <span class="sb-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="6" cy="16" r="3" stroke="#475569" stroke-width="2"/><circle cx="18" cy="16" r="3" stroke="#475569" stroke-width="2"/><path d="M9 16h6l2-5h-4l-2-3H7" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <span class="sb-label">Vente de Motos</span>
+        </a>
+        <a href="#" id="menuCancel" class="sb-item" style="color:#b91c1c">
+          <span class="sb-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#b91c1c" stroke-width="2" stroke-linecap="round"/></svg>
+          </span>
+          <span class="sb-label">Demande d’annulation</span>
+        </a>
+        {% elif role == 'commercial_dir' %}
+        <a href="{% url 'sales:commercial_dashboard' %}" class="sb-item">
+          <span class="sb-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 12l9-8 9 8v8a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1v-5H10v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-8z" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <span class="sb-label">Tableau de bord Commercial</span>
+        </a>
+        {% elif role == 'warehouse_mgr' or request.path|default:''|slice:":20" == '/inventory/warehouse' %}
+        <a href="{% url 'inventory:warehouse_dashboard' %}" class="sb-item">
+          <span class="sb-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 12l9-8 9 8v8a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1v-5H10v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-8z" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <span class="sb-label">Tableau de bord (Entrepôt)</span>
+        </a>
+        <a href="{% url 'inventory:warehouse_requests' %}" class="sb-item">
+          <span class="sb-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 5h16M4 12h16M4 19h16" stroke="#475569" stroke-width="2" stroke-linecap="round"/></svg>
+          </span>
+          <span class="sb-label">Commandes des points de vente</span>
+        </a>
+        <a href="{% url 'inventory:warehouse_journal' %}" class="sb-item">
+          <span class="sb-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 7h16v10H4V7zm0 6h5l2 2 2-2h5" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <span class="sb-label">Journal de l'entrepôt</span>
+        </a>
+        <a href="{% url 'inventory:salespoints_stock' %}" class="sb-item">
+          <span class="sb-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M20 13v7H4v-7M4 10l8-6 8 6" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <span class="sb-label">Stocks des points de vente</span>
+        </a>
+        <a href="{% url 'inventory:warehouse_purchase_builder' %}" class="sb-item">
+          <span class="sb-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 7h12M6 12h9M6 17h10" stroke="#475569" stroke-width="2" stroke-linecap="round"/></svg>
+          </span>
+          <span class="sb-label">Commande (réapprovisionnement entrepôt)</span>
+        </a>
+        <a href="{% url 'inventory:transfer_history' %}" class="sb-item">
+          <span class="sb-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 5h16M4 11h16M4 17h16" stroke="#475569" stroke-width="2" stroke-linecap="round"/></svg>
+          </span>
+          <span class="sb-label">Historiques des transferts</span>
+        </a>
+        <a href="{% url 'inventory:restock_stats' %}" class="sb-item">
+          <span class="sb-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 4h16v6H4V4zM4 14h10v6H4v-6zM16 14h4v6h-4v-6z" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <span class="sb-label">Statistiques de ravitaillement</span>
+        </a>
+        {% else %}
+        <!-- Dashboard -->
+        <a href="{% url 'sales:manager_dashboard' %}" class="sb-item">
+          <span class="sb-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 12l9-8 9 8v8a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1v-5H10v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-8z" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <span class="sb-label">Tableau de bord</span>
+        </a>
+        <!-- Journal -->
+        <a href="{% url 'sales:manager_journal' %}" class="sb-item">
+          <span class="sb-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 5h16M4 12h16M4 19h16" stroke="#475569" stroke-width="2" stroke-linecap="round"/></svg>
+          </span>
+          <span class="sb-label">Journal des ventes</span>
+        </a>
+        <a href="{% url 'sales:manager_restock' %}" class="sb-item">
+          <span class="sb-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M20 13v7H4v-7M4 10l8-6 8 6" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <span class="sb-label">Commande</span>
+        </a>
+        <a href="{% url 'sales:manager_inbound' %}" class="sb-item">
+          <span class="sb-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-4-4m4 4l4-4M3 21h18" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <span class="sb-label">Approvisionnement</span>
+        </a>
+        <a href="{% url 'sales:manager_transfer_request' %}" class="sb-item">
+          <span class="sb-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M7 7h10M7 12h6M7 17h8" stroke="#475569" stroke-width="2" stroke-linecap="round"/></svg>
+          </span>
+          <span class="sb-label">Demande de transfert</span>
+        </a>
+        <a href="{% url 'sales:manager_transfer_inbox' %}" class="sb-item">
+          <span class="sb-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 7h16v10H4V7zm0 6h5l2 2 2-2h5" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <span class="sb-label">Transferts à effectuer</span>
+        </a>
+        <a href="{% url 'sales:manager_transfer_history' %}" class="sb-item">
+          <span class="sb-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 5h16M4 11h16M4 17h16" stroke="#475569" stroke-width="2" stroke-linecap="round"/></svg>
+          </span>
+          <span class="sb-label">Historique des transferts</span>
+        </a>
+        {% endif %}
+        {% endwith %}
+        <a href="{% url 'logout' %}" class="sb-item" style="margin-top:6px; color:#7c0a0a">
+          <span class="sb-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 17l5-5-5-5M20 12H9" stroke="#7c0a0a" stroke-width="2" stroke-linecap="round"/><path d="M13 5V4a2 2 0 00-2-2H5a2 2 0 00-2 2v16a2 2 0 002 2h6a2 2 0 002-2v-1" stroke="#7c0a0a" stroke-width="2" stroke-linecap="round"/></svg>
+          </span>
+          <span class="sb-label">Déconnexion</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="content">
+      <div class="content-pad">
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+  </div>
+
+  <div class="toasts" id="toasts" aria-live="polite" role="status"></div>
+
+  <script>
+    (function(){
+      const sidebar = document.getElementById('sidebar');
+      const btn = document.getElementById('btnSidebar');
+      const ribbon = document.getElementById('ribbonText');
+
+      // Mobile sidebar toggle (same behavior as cashier)
+      function isMobile(){ return matchMedia('(max-width: 720px)').matches }
+      function toggle(){
+        if (isMobile()) sidebar.classList.toggle('show');
+        else sidebar.classList.toggle('collapsed');
+      }
+      btn && btn.addEventListener('click', toggle);
+
+      // Live clock ribbon
+      function tick(){
+        const d=new Date();
+        const pad=n=>n<10?('0'+n):n;
+        const cap=s=>s? s.charAt(0).toUpperCase()+s.slice(1):s;
+        const dateStr = cap(d.toLocaleDateString('fr-FR',{weekday:'long',year:'numeric',month:'long',day:'numeric'}));
+        const timeStr = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+        const spName = `{{ salespoint.name|default:'—' }}`;
+        
+        // Check if we're on a warehouse manager page
+        const isWarehousePage = window.location.pathname.includes('/inventory/warehouse/');
+        
+        if (ribbon) {
+          if (isWarehousePage) {
+            ribbon.textContent = `ECAGES • MAGASIN (DIRECTION GENERALE) • ${dateStr} — ${timeStr}   \u00A0\u00A0\u00A0`;
+          } else {
+            ribbon.textContent = `ECAGES • ${spName} • ${dateStr} — ${timeStr}   \u00A0\u00A0\u00A0`;
+          }
+        }
+      }
+      tick(); setInterval(tick, 1000);
+
+      // ===== Global loaders (reused) =====
+      const topProgress = document.getElementById('topProgress');
+      const overlay = document.getElementById('overlayLoader');
+      let progTimer=null, progInterval=null, progVal=0, progStart=0;
+      function setBar(p){ if(topProgress) topProgress.style.width = Math.max(0, Math.min(100, p)) + '%'; }
+      function startProgress(){
+        if (!topProgress) return; 
+        clearTimeout(progTimer); progTimer = null;
+        clearInterval(progInterval); progInterval = null;
+        progVal = 0; setBar(0);
+        topProgress.classList.remove('done');
+        progStart = Date.now();
+        requestAnimationFrame(()=>{
+          topProgress.classList.add('show');
+          progVal = 5; setBar(progVal);
+          progInterval = setInterval(()=>{
+            if (progVal < 60) {
+              progVal += 2 + Math.random()*3;
+              if (progVal > 60) progVal = 60;
+              setBar(progVal);
+            }
+          }, 350);
+        });
+      }
+      function doneProgress(){
+        if (!topProgress) return;
+        clearInterval(progInterval); progInterval = null;
+        const elapsed = Date.now() - (progStart || Date.now());
+        const minVisible = 1200;
+        const finish = ()=>{
+          topProgress.classList.add('done');
+          setBar(100);
+          clearTimeout(progTimer);
+          progTimer = setTimeout(()=>{
+            topProgress.classList.remove('show','done');
+            setBar(0);
+          }, 400);
+        };
+        if (elapsed < minVisible) setTimeout(finish, minVisible - elapsed); else finish();
+      }
+      function showLoader(show){ if(!overlay) return; if (show) overlay.classList.add('show'); else overlay.classList.remove('show'); }
+
+      // Expose helpers
+      window.ECAGES = Object.assign(window.ECAGES || {}, { startProgress, doneProgress, showLoader });
+
+      // Auto-progress on internal nav clicks
+      function isInternal(href){
+        try { const u = new URL(href, window.location.href); return u.origin === window.location.origin; } catch { return false; }
+      }
+      document.addEventListener('click', (e)=>{
+        const a = e.target.closest('a[href]');
+        if(!a) return;
+        if (a.hasAttribute('data-no-loader') || a.target === '_blank' || a.download) return;
+        if (!isInternal(a.getAttribute('href'))) return;
+        const href = a.getAttribute('href');
+        if (href && href.startsWith('#')) return;
+        startProgress();
+      }, true);
+      window.addEventListener('pageshow', ()=> doneProgress());
+
+      // Show overlay loader on POST forms
+      document.addEventListener('submit', (e)=>{
+        const form = e.target.closest('form');
+        if(!form) return;
+        if (form.hasAttribute('data-no-loader')) return;
+        const method = (form.getAttribute('method')||'get').toLowerCase();
+        if (method !== 'get' || form.hasAttribute('data-show-loader')) {
+          showLoader(true);
+          startProgress();
+        }
+      }, true);
+
+      // Role-aware sidebar actions
+      function proxyClick(id){ const el=document.getElementById(id); if(el){ el.click(); return true; } return false; }
+      function openViaEvent(kind){ document.dispatchEvent(new CustomEvent('sales:open',{ detail:{ kind } })); }
+      document.getElementById('menuPieces')?.addEventListener('click',(e)=>{ e.preventDefault(); if(!proxyClick('btnPiece')) openViaEvent('pieces'); });
+      document.getElementById('menuMotos') ?.addEventListener('click',(e)=>{ e.preventDefault(); if(!proxyClick('btnMoto')) openViaEvent('motos'); });
+      document.getElementById('menuCancel')?.addEventListener('click',(e)=>{ e.preventDefault(); if(!proxyClick('btnCancel')) openViaEvent('cancel'); });
+
+      // Notifications fetch + dropdown
+      const btnNotif = document.getElementById('btnNotif');
+      const box = document.getElementById('notifBox');
+      const dot = document.getElementById('notifDot');
+      const list = document.getElementById('notifItems');
+      function getCSRF(){ const m=document.cookie.match('(^|;)\\s*csrftoken\\s*=\\s*([^;]+)'); if(m) return m.pop(); const el=document.querySelector('input[name="csrfmiddlewaretoken"]'); return el? el.value : ''; }
+      const CSRF = getCSRF();
+      let lastRows = [];
+      async function loadNotifications(){
+        try{
+          const r=await fetch('/sales/api/notifications/');
+          const res=await r.json();
+          if(r.ok && res.ok){
+            list.innerHTML='';
+            lastRows = res.rows || [];
+            if(lastRows.length){
+              dot.style.display='block';
+              lastRows.forEach(n=>{
+                const item=document.createElement('div');
+                item.className='flex items-start gap-2 p-2 rounded-lg border border-[var(--ring)] cursor-pointer';
+                const countBadge = n.count>1 ? `<span class="ml-2 inline-block text-xs font-extrabold px-2 py-0.5 rounded-full bg-gray-100 border border-[var(--ring)]">x${n.count}</span>` : '';
+                item.innerHTML=`<div class=\"text-sm font-bold\">${n.msg}${countBadge}</div><div class=\"text-xs text-[var(--muted)]\">${n.created}</div>`;
+                item.addEventListener('click', async ()=>{
+                  try{ await fetch('/sales/api/notifications/read/',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':CSRF},body:JSON.stringify({ids:n.ids||[]})}); }catch{}
+                  if(n.link){ location.href=n.link; } else { item.remove(); }
+                });
+                list.appendChild(item);
+              });
+            } else {
+              dot.style.display='none';
+              list.innerHTML='<div class="text-sm text-[var(--muted)] p-2">Aucune notification</div>';
+            }
+          }
+        }catch(e){}
+      }
+      document.getElementById('notifMarkAll')?.addEventListener('click', async ()=>{
+        if(!lastRows.length) return;
+        const allIds = lastRows.flatMap(x=> Array.isArray(x.ids) ? x.ids : (x.id ? [x.id] : []));
+        if(!allIds.length) { lastRows=[]; list.innerHTML='<div class="text-sm text-[var(--muted)] p-2">Aucune notification</div>'; dot.style.display='none'; return; }
+        try{
+          const r=await fetch('/sales/api/notifications/read/',{
+            method:'POST',
+            headers:{'Content-Type':'application/json','X-CSRFToken':CSRF},
+            body:JSON.stringify({ids: allIds})
+          });
+          const res=await r.json();
+          if(r.ok && res.ok){ lastRows=[]; list.innerHTML='<div class="text-sm text-[var(--muted)] p-2">Aucune notification</div>'; dot.style.display='none'; }
+        }catch{}
+      });
+      btnNotif && btnNotif.addEventListener('click', (e)=>{ e.preventDefault(); if(box.style.display==='none'){ loadNotifications(); box.style.display='block'; } else { box.style.display='none'; } });
+      document.addEventListener('click', (e)=>{ const w=document.getElementById('notifWrap'); if(!w) return; if(!w.contains(e.target)){ box.style.display='none'; } }, true);
+      // Light polling to update the red dot without opening box
+      async function pingNotifications(){
+        try{
+          const r=await fetch('/sales/api/notifications/');
+          const res=await r.json();
+          if(r.ok && res.ok){ dot.style.display = (res.rows && res.rows.length) ? 'block' : 'none'; }
+        }catch(e){}
+        finally { setTimeout(pingNotifications, 12000); }
+      }
+      pingNotifications();
+    })();
+  </script>
+
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

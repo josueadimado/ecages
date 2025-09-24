@@ -1,0 +1,161 @@
+{% extends "layouts/base_sales.html" %}
+{% block title %}Historiques des transferts{% endblock %}
+{% block extra_css %}
+<style>
+  .kp-card{background:#fff;border:1px solid var(--ring);border-radius:14px;box-shadow:var(--shadow)}
+  .kp-title{font-weight:900;font-size:1.1rem}
+  .btn{border:1px solid var(--ring);border-radius:10px;background:#fff;padding:.5rem .8rem;font-weight:800;color:#1f2937}
+  .btn:hover{box-shadow:0 6px 16px rgba(0,0,0,.08)}
+  .btn-brand{background:var(--brand);color:#fff;border-color:transparent}
+  .kp-table{width:100%;border-collapse:separate;border-spacing:0}
+  .kp-table thead th{position:sticky;top:0;background:#fff;z-index:1;text-align:left;font-size:.8rem;color:#64748b;border-bottom:1px solid var(--ring);padding:.6rem .75rem}
+  .kp-table tbody td{border-bottom:1px solid #f2f4f7;padding:.6rem .75rem}
+  .badge{border-radius:999px;padding:.15rem .5rem;font-size:.72rem;font-weight:800;display:inline-block}
+  .badge-wait{background:#fef3c7;color:#92400e}
+  .badge-ok{background:#d1fae5;color:#065f46}
+  .badge-rej{background:#fee2e2;color:#991b1b}
+  .muted{color:#64748b}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page">
+  <div class="ribbon"><div class="marquee"><span id="ribbonText">ECAGES • Historiques des transferts</span></div></div>
+  <div class="kp-card" style="margin-bottom:12px;padding:12px 16px;">
+    <form method="get" class="kp-toolbar" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <div class="kp-title" style="margin-right:auto;">Historiques des transferts</div>
+      <input class="btn" name="q" value="{{ q }}" placeholder="Rechercher produit / PV / utilisateur" />
+      <select class="btn" name="from_sp">
+        <option value="0">De (tous)</option>
+        {% for sp in salespoints %}
+          <option value="{{ sp.id }}" {% if sp_from == sp.id %}selected{% endif %}>{{ sp.name }}</option>
+        {% endfor %}
+      </select>
+      <select class="btn" name="to_sp">
+        <option value="0">Vers (tous)</option>
+        {% for sp in salespoints %}
+          <option value="{{ sp.id }}" {% if sp_to == sp.id %}selected{% endif %}>{{ sp.name }}</option>
+        {% endfor %}
+      </select>
+      <input class="btn" type="date" name="from" value="{{ date_from }}" />
+      <input class="btn" type="date" name="to" value="{{ date_to }}" />
+      <button class="btn">Filtrer</button>
+      <a class="btn" id="exportCsv" href="#">Exporter CSV</a>
+    </form>
+    <div class="muted" style="margin-top:8px;font-weight:800">
+      {{ paginator.count|default:rows|length }} transfert(s) • Qté demandée: {{ total_requested }} • Qté approuvée: {{ total_approved }}
+    </div>
+  </div>
+
+  <div class="kp-card" style="padding:0;overflow:auto;">
+    <table class="kp-table" style="min-width:1000px">
+      <thead>
+        <tr>
+          <th>Référence</th>
+          <th>Date</th>
+          <th>De</th>
+          <th>Vers</th>
+          <th>Demandé par</th>
+          <th>Statut</th>
+          <th style="width:110px;">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td style="font-weight:800">{{ r.number|default:'—' }}</td>
+          <td class="muted">{{ r.created_at|date:"d/m/Y H:i" }}</td>
+          <td style="font-weight:800"><span class="badge" style="background:#eff6ff;color:#1e40af">→</span> {{ r.from_salespoint.name }}</td>
+          <td style="font-weight:800"><span class="badge" style="background:#f0fdf4;color:#065f46">✔</span> {{ r.to_salespoint.name }}</td>
+          <td>{{ r.requested_by.username }}</td>
+          <td>
+            {% if r.status == 'approved' %}<span class="badge badge-ok">Approuvée</span>
+            {% elif r.status == 'rejected' %}<span class="badge badge-rej">Rejetée</span>
+            {% else %}<span class="badge badge-wait">En attente</span>{% endif %}
+          </td>
+          <td><button class="btn" data-view="{{ r.id }}">Voir</button></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" style="padding:12px;color:#64748b;font-weight:800">Aucun transfert trouvé.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if paginator %}
+  <div class="pagination" style="display:flex;justify-content:center;align-items:center;gap:8px;margin:14px 0;">
+    {% if page.has_previous %}
+      <a class="btn" href="?page=1">« Première</a>
+      <a class="btn" href="?page={{ page.previous_page_number }}">‹ Précédente</a>
+    {% else %}
+      <span class="btn" style="opacity:.5;pointer-events:none;">« Première</span>
+      <span class="btn" style="opacity:.5;pointer-events:none;">‹ Précédente</span>
+    {% endif %}
+    <span class="btn btn-brand">Page {{ page.number }} / {{ paginator.num_pages }}</span>
+    {% if page.has_next %}
+      <a class="btn" href="?page={{ page.next_page_number }}">Suivante ›</a>
+      <a class="btn" href="?page={{ paginator.num_pages }}">Dernière »</a>
+    {% else %}
+      <span class="btn" style="opacity:.5;pointer-events:none;">Suivante ›</span>
+      <span class="btn" style="opacity:.5;pointer-events:none;">Dernière »</span>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<!-- Modal -->
+<div id="trModal" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.45);z-index:80;">
+  <div style="width:min(900px,95vw);background:#fff;border:1px solid var(--ring);border-radius:16px;box-shadow:0 20px 60px rgba(2,8,23,.25);overflow:hidden;">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--ring);font-weight:900;">
+      <div>Détails du transfert</div>
+      <button id="trClose" class="btn">✕</button>
+    </div>
+    <div id="trBody" style="padding:12px 16px;max-height:70vh;overflow:auto"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  // Export CSV preserving filters
+  const exportBtn = document.getElementById('exportCsv');
+  if (exportBtn) {
+    const params = new URLSearchParams(window.location.search);
+    exportBtn.href = '{% url "inventory:transfer_history_export_csv" %}?'+params.toString();
+  }
+  // Marquee clock
+  var el = document.getElementById('ribbonText');
+  function pad(n){return n<10?'0'+n:n}
+  function cap(s){return s? s.charAt(0).toUpperCase()+s.slice(1):s;}
+  var dateStr = cap((new Date()).toLocaleDateString('fr-FR', {weekday:'long', year:'numeric', month:'long', day:'numeric'}));
+  function tick(){ var d=new Date(); var timeStr=pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds()); if(el){ el.textContent='ECAGES • MAGASIN (DIRECTION GENERALE) • '+dateStr+' — '+timeStr; } }
+  tick(); setInterval(tick, 1000);
+  document.querySelectorAll('button[data-view]').forEach(btn => {
+    btn.addEventListener('click', async function(){
+      const id = this.dataset.view;
+      const modal = document.getElementById('trModal');
+      const body = document.getElementById('trBody');
+      body.innerHTML = '<div style="padding:8px;color:#64748b">Chargement...</div>';
+      modal.style.display = 'flex';
+      try{
+        const resp = await fetch('{% url "inventory:api_transfer_request_lines" 0 %}'.replace('/0/','/'+id+'/'));
+        const out = await resp.json();
+        if(!(out&&out.ok)){ body.innerHTML = '<div style="padding:8px;color:#b91c1c">Erreur</div>'; return; }
+        body.innerHTML = `
+          <div style="margin-bottom:8px;color:#64748b;font-weight:800">
+            ${out.created_at} • ${out.from} → ${out.to} • Demandeur: ${out.requested_by} • Approbateur: ${out.approved_by||'—'}
+          </div>
+          <table class="kp-table" style="min-width:760px"><thead><tr><th>Produit</th><th>Marque</th><th>Qté demandée</th><th>Qté approuvée</th></tr></thead>
+          <tbody>${out.lines.map(l=>`<tr><td style="font-weight:800">${l.name}</td><td>${l.brand||'—'}</td><td>${l.qty_requested}</td><td>${l.qty_approved}</td></tr>`).join('')}</tbody></table>
+        `;
+      }catch(e){
+        body.innerHTML = '<div style="padding:8px;color:#b91c1c">Erreur réseau</div>';
+      }
+    });
+  });
+  document.getElementById('trClose').addEventListener('click', function(){ document.getElementById('trModal').style.display='none'; });
+});
+</script>
+{% endblock %}
+

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>Impression des bons d'approvisionnement</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; padding:20px}
+    table{width:100%; border-collapse:collapse; margin-top:12px}
+    th,td{border:1px solid #e5e7eb; padding:8px; text-align:left}
+    th{background:#f9fafb}
+    .btn{display:inline-block; padding:8px 12px; border:1px solid #e5e7eb; border-radius:8px; text-decoration:none; color:#111827; font-weight:700}
+    .btn:hover{background:#f8fafc}
+  </style>
+</head>
+<body>
+  <h1 style="margin:0 0 8px 0;">Impression des bons d'approvisionnement</h1>
+  <p>Sélection: {{ rows|length }} demande(s)</p>
+
+  <div style="margin:8px 0 16px 0; display:flex; gap:8px;">
+    <button class="btn" onclick="openAll()">Ouvrir tous les bons dans des onglets</button>
+  </div>
+
+  <table>
+    <thead><tr><th>Référence</th><th>Point de vente</th><th>Action</th></tr></thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td>{{ r.reference }}</td>
+        <td>{{ r.salespoint }}</td>
+        <td><a class="btn" href="{{ r.print_url }}" target="_blank" rel="noopener">Imprimer</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <script>
+    function openAll(){
+      var links = document.querySelectorAll('a.btn[target="_blank"]');
+      links.forEach(function(a){ window.open(a.href, '_blank'); });
+    }
+  </script>
+</body>
+</html>
+
+

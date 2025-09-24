@@ -1,0 +1,402 @@
+{% extends "layouts/base_sales.html" %}
+{% block title %}Commande d'approvisionnement entrepôt{% endblock %}
+{% block extra_css %}
+<style>
+  .kp-card{background:#fff;border:1px solid var(--ring);border-radius:14px;box-shadow:var(--shadow)}
+  .kp-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .kp-title{font-weight:900;font-size:1.1rem}
+  .kp-pill{padding:.42rem .9rem;border:1px solid var(--ring);border-radius:999px;font-weight:800;background:#fff}
+  .kp-pill.active{background:var(--brand);color:#fff;border-color:transparent}
+  .kp-table{width:100%;border-collapse:separate;border-spacing:0}
+  .kp-table th{position:sticky;top:0;background:#fff;z-index:1;text-align:left;font-size:.8rem;color:#64748b;border-bottom:1px solid var(--ring);padding:.6rem .75rem}
+  .kp-table td{border-bottom:1px solid #f2f4f7;padding:.6rem .75rem}
+  .pill-low{background:#fef3c7;color:#92400e;border-radius:999px;padding:.2rem .5rem;font-size:.72rem;font-weight:800}
+  .pill-zero{background:#fee2e2;color:#991b1b;border-radius:999px;padding:.2rem .5rem;font-size:.72rem;font-weight:800}
+  .pill-ok{background:#d1fae5;color:#065f46;border-radius:999px;padding:.2rem .5rem;font-size:.72rem;font-weight:800}
+  .fab{position:sticky;bottom:0;display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-top:2px solid var(--ring);background:#fff}
+  /* Better buttons/inputs */
+  .btn{border:1px solid var(--ring);border-radius:10px;background:#fff;padding:.5rem .8rem;font-weight:800;color:#1f2937}
+  .btn:hover{box-shadow:0 6px 16px rgba(0,0,0,.08)}
+  .btn-brand{background:var(--brand);color:#fff;border-color:transparent}
+  .btn-outline{background:#fff;color:#580706;border-color:#580706}
+  .input{border:1px solid var(--ring);border-radius:10px;padding:.55rem .8rem;font-weight:700;min-width:240px}
+  .input::placeholder{color:#9ca3af}
+  .input-qty{min-width:96px;text-align:right}
+</style>
+{% endblock %}
+{% block content %}
+<div class="page">
+  <div class="ribbon"><div class="marquee"><span id="ribbonText">ECAGES • Commande d'approvisionnement pour l'entrepôt</span></div></div>
+
+  <!-- Filters -->
+  <div class="kp-card" style="margin-bottom:12px;padding:12px 16px;">
+    <!-- Notices -->
+    <div id="noticeBar" style="display:none;margin-bottom:10px;padding:10px 12px;border-radius:10px;font-weight:800"></div>
+    <form method="get" class="kp-toolbar">
+      <div class="kp-title" style="margin-right:auto;">Produits à réapprovisionner</div>
+      <label class="kp-pill {% if kind == 'piece' %}active{% endif %}">
+        <input type="radio" name="type" value="piece" {% if kind == 'piece' %}checked{% endif %} style="display:none" /> Pièces
+      </label>
+      <label class="kp-pill {% if kind == 'moto' %}active{% endif %}">
+        <input type="radio" name="type" value="moto" {% if kind == 'moto' %}checked{% endif %} style="display:none" /> Motos
+      </label>
+      <label class="kp-pill {% if kind == 'all' %}active{% endif %}">
+        <input type="radio" name="type" value="all" {% if kind == 'all' %}checked{% endif %} style="display:none" /> Tout
+      </label>
+      <input class="btn" name="q" value="{{ q }}" placeholder="Rechercher produit ou marque..." style="min-width:240px" />
+      <button class="btn">Actualiser</button>
+      <!-- Actions moved to the top bar -->
+      <button id="saveDraft" type="button" class="btn">💾 Enregistrer</button>
+      <button id="openSearch" type="button" class="btn">🔎 Ajouter des produits</button>
+    </form>
+    <div style="margin-top:8px;color:#64748b;font-weight:800">
+      {% if total_products_all %}
+        {{ low_count }} / {{ total_in_stock }} produits actifs ({{ total_products_all }} au total) sont en dessous du seuil
+      {% else %}
+        {{ low_count }} / {{ total_in_stock }} produits en stock sont en dessous du seuil
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="kp-card" style="padding:0;overflow:auto;">
+    <div style="padding:12px 16px;border-bottom:1px solid var(--ring);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <div style="color:#64748b;font-weight:800">Sélectionnez les articles à envoyer au Directeur Commercial</div>
+      <div id="summary" style="font-weight:800;color:#111827">0 article(s) sélectionnés</div>
+    </div>
+    <table class="kp-table" style="min-width:980px;">
+      <thead>
+        <tr>
+          <th style="width:38px;"><input id="pickAll" type="checkbox"/></th>
+          <th>Produit</th>
+          <th>Marque</th>
+          <th>Statut</th>
+          <th>Restant</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        {% with rem=r.remaining_qty alert=r.alert_qty %}
+        <tr>
+          <td><input class="pick" type="checkbox" data-pid="{{ r.product.id }}" /></td>
+          <td style="font-weight:800">{{ r.product.name }}</td>
+          <td>{{ r.product.brand.name|default:'—' }}</td>
+          <td>
+            {% if rem == 0 %}<span class="pill-zero">Épuisé</span>
+            {% elif rem <= alert %}<span class="pill-low">Bas</span>
+            {% else %}<span class="pill-ok">OK</span>{% endif %}
+          </td>
+          <td>{{ rem }}</td>
+          <td><button class="btn btn-sm" data-remove-row data-pid="{{ r.product.id }}">Retirer</button></td>
+        </tr>
+        {% endwith %}
+        {% empty %}
+        <tr><td colspan="6" style="color:#64748b;padding:1rem .9rem;font-weight:700">Aucun article bas en stock.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div class="fab">
+      <div style="color:#64748b;font-weight:800">Astuce: sélectionnez puis envoyez la commande</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button id="sendCmd" class="btn btn-brand" disabled>Envoyer au Directeur Commercial</button>
+      </div>
+    </div>
+  </div>
+
+  {% if paginator %}
+  <div class="pagination" style="display:flex;justify-content:center;align-items:center;gap:8px;margin:14px 0;">
+    {% if page.has_previous %}
+      <a class="btn" href="?type={{ kind }}&q={{ q }}&per_page={{ per_page }}&page=1">« Première</a>
+      <a class="btn" href="?type={{ kind }}&q={{ q }}&per_page={{ per_page }}&page={{ page.previous_page_number }}">‹ Précédente</a>
+    {% else %}
+      <span class="btn" style="opacity:.5;pointer-events:none;">« Première</span>
+      <span class="btn" style="opacity:.5;pointer-events:none;">‹ Précédente</span>
+    {% endif %}
+    <span class="btn" style="background:var(--brand);color:#fff;border-color:var(--brand)">Page {{ page.number }} / {{ paginator.num_pages }}</span>
+    {% if page.has_next %}
+      <a class="btn" href="?type={{ kind }}&q={{ q }}&per_page={{ per_page }}&page={{ page.next_page_number }}">Suivante ›</a>
+      <a class="btn" href="?type={{ kind }}&q={{ q }}&per_page={{ per_page }}&page={{ paginator.num_pages }}">Dernière »</a>
+    {% else %}
+      <span class="btn" style="opacity:.5;pointer-events:none;">Suivante ›</span>
+      <span class="btn" style="opacity:.5;pointer-events:none;">Dernière »</span>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- Search modal -->
+  <div id="searchModal" class="modal" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.45);z-index:80;">
+    <div class="sheet" style="width:min(900px,95vw);background:#fff;border:1px solid var(--ring);border-radius:16px;box-shadow:0 20px 60px rgba(2,8,23,.25);overflow:hidden;">
+      <div class="hd" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--ring);font-weight:900;">
+        <div>Ajouter des produits</div>
+        <button id="closeSearch" class="btn">✕</button>
+      </div>
+      <div class="bd" style="padding:12px 16px;max-height:70vh;overflow:auto">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+          <input id="searchInput" class="btn" placeholder="Tapez pour rechercher des produits..." style="flex:1;min-width:260px" />
+          <select id="searchType" class="btn">
+            <option value="all">Tout</option>
+            <option value="piece">Pièces</option>
+            <option value="moto">Motos</option>
+          </select>
+        </div>
+        <table class="kp-table" style="min-width:760px"><thead><tr><th>Produit</th><th>Marque</th><th>Restant</th><th>Seuil</th><th>Action</th></tr></thead><tbody id="searchRows"></tbody></table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  // URLs
+  const submitUrl = '{% url "inventory:api_wh_cmd_submit" %}';
+  const saveUrl = '{% url "inventory:api_wh_cmd_save" %}';
+  const searchUrl = '{% url "inventory:api_wh_cmd_search_products" %}';
+
+  // Notice helper
+  const noticeBar = document.getElementById('noticeBar');
+  function showNotice(message, kind){
+    if(!noticeBar) return;
+    noticeBar.textContent = message;
+    const styles = {
+      success: { bg: '#ecfdf5', color:'#065f46', border:'#a7f3d0' },
+      error:   { bg: '#fef2f2', color:'#991b1b', border:'#fecaca' },
+      info:    { bg: '#eff6ff', color:'#1e40af', border:'#bfdbfe' }
+    };
+    const s = styles[kind||'info'];
+    noticeBar.style.background = s.bg;
+    noticeBar.style.color = s.color;
+    noticeBar.style.border = '1px solid '+s.border;
+    noticeBar.style.display = 'block';
+    // auto hide after 4s
+    clearTimeout(noticeBar._t);
+    noticeBar._t = setTimeout(()=>{ noticeBar.style.display='none'; }, 4000);
+    // ensure visible
+    noticeBar.scrollIntoView({behavior:'smooth', block:'nearest'});
+  }
+
+  // Marquee clock (same as other pages)
+  var el = document.getElementById('ribbonText');
+  function pad(n){return n<10?'0'+n:n}
+  function cap(s){return s? s.charAt(0).toUpperCase()+s.slice(1):s;}
+  var dateStr = cap((new Date()).toLocaleDateString('fr-FR', {weekday:'long', year:'numeric', month:'long', day:'numeric'}));
+  function tick(){ var d=new Date(); var timeStr=pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds()); if(el){ el.textContent='ECAGES • MAGASIN (DIRECTION GENERALE) • '+dateStr+' — '+timeStr; } }
+  tick(); setInterval(tick, 1000);
+  const pickAll = document.getElementById('pickAll');
+  const picks = Array.from(document.querySelectorAll('input.pick'));
+  const btn = document.getElementById('sendCmd');
+  const summary = document.getElementById('summary');
+
+  function compute(){
+    const rows = Array.from(document.querySelectorAll('input.pick:checked')).map(cb => {
+      const tr = cb.closest('tr');
+      const qtyInput = tr ? tr.querySelector('input.qty') : null;
+      const qty = parseInt(((qtyInput && qtyInput.value) ? qtyInput.value : '1'), 10) || 1;
+      return { pid: parseInt(cb.dataset.pid||'0',10), qty };
+    });
+    summary.textContent = rows.length + ' article(s) sélectionnés';
+    btn.disabled = rows.length === 0;
+  }
+
+  picks.forEach(cb => cb.addEventListener('change', compute));
+  document.querySelectorAll('input.qty').forEach(inp => inp.addEventListener('input', compute));
+  // Event delegation for remove buttons in main table (works for existing and future rows)
+  const mainTbodyEl = document.querySelector('.kp-table tbody');
+  if (mainTbodyEl) {
+    mainTbodyEl.addEventListener('click', function(e){
+      const removeBtn = e.target.closest('button[data-remove-row]');
+      if (!removeBtn) return;
+      const row = removeBtn.closest('tr');
+      const pidStr = removeBtn.dataset.pid || (row && row.querySelector('input.pick') ? row.querySelector('input.pick').dataset.pid : '');
+      if (row) row.remove();
+      compute();
+      // If the search modal is open, toggle its button back to Ajouter
+      if (pidStr) {
+        const modalBtn = document.querySelector('#searchModal button[data-add="'+pidStr+'"]');
+        if (modalBtn) { modalBtn.dataset.mode = 'add'; modalBtn.textContent = 'Ajouter'; }
+      }
+    });
+  }
+  if (pickAll) pickAll.addEventListener('change', function(){
+    picks.forEach(cb => { cb.checked = pickAll.checked; });
+    compute();
+  });
+  compute();
+
+  // Auto-submit when switching Pièces / Motos / Tout
+  document.querySelectorAll('.kp-pill input[type="radio"]').forEach(function(radio){
+    radio.addEventListener('change', function(){
+      const form = this.closest('form');
+      if(form) form.submit();
+    });
+  });
+
+  btn.addEventListener('click', async function(){
+    const CSRF = (document.cookie.match('(^|;)\\s*csrftoken\\s*=\\s*([^;]+)')||[]).pop() || '';
+    const lines = [];
+    document.querySelectorAll('input.pick:checked').forEach(cb => {
+      const tr = cb.closest('tr');
+      const qty = parseInt((tr.querySelector('input.qty').value||'1'),10)||1;
+      const pid = parseInt(cb.dataset.pid||'0',10);
+      if (pid && qty>0) lines.push({product_id: pid, qty});
+    });
+    if (!lines.length) return;
+    btn.disabled = true; btn.textContent = 'Envoi...';
+    try{
+      const resp = await fetch(submitUrl, {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':CSRF}, body: JSON.stringify({lines})});
+      const out = await resp.json();
+      if(out && out.ok){ showNotice('Commande envoyée: '+(out.reference||''), 'success'); location.reload(); }
+      else{ showNotice(out.error||'Erreur lors de l\'envoi', 'error'); btn.disabled=false; btn.textContent='Envoyer au Directeur Commercial'; }
+    }catch(e){ showNotice('Erreur réseau lors de l\'envoi', 'error'); btn.disabled=false; btn.textContent='Envoyer au Directeur Commercial'; }
+  });
+
+  // Save draft
+  document.getElementById('saveDraft').addEventListener('click', async function(e){
+    e.preventDefault();
+    const CSRF = (document.cookie.match('(^|;)\\s*csrftoken\\s*=\\s*([^;]+)')||[]).pop() || '';
+    const lines = [];
+    document.querySelectorAll('.kp-table tbody tr').forEach(tr => {
+      const cb = tr.querySelector('input.pick');
+      if (!cb) return;
+      const pid = parseInt(cb.dataset.pid||'0',10);
+      const qtyInput = tr.querySelector('input.qty');
+      const qty = parseInt(((qtyInput && qtyInput.value) ? qtyInput.value : '1'),10) || 1;
+      if (pid && qty>0) lines.push({product_id: pid, qty});
+    });
+    // extract filters
+    const params = new URLSearchParams(window.location.search);
+    const kind = params.get('type') || 'all';
+    const q = params.get('q') || '';
+    try{
+      const resp = await fetch(saveUrl, {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':CSRF}, body: JSON.stringify({mode:'all', kind, q, lines})});
+      const out = await resp.json();
+      if(out && out.ok){ showNotice('Brouillon sauvegardé ('+out.count+' articles)', 'success'); }
+      else{ showNotice(out.error||'Erreur lors de l\'enregistrement', 'error'); }
+    }catch(e){ showNotice('Erreur réseau lors de l\'enregistrement', 'error'); }
+  });
+
+  // Modal logic
+  const modal = document.getElementById('searchModal');
+  document.getElementById('openSearch').addEventListener('click', function(){ 
+    modal.style.display='flex'; 
+    // Clear search and show empty state
+    document.getElementById('searchInput').value = '';
+    const tbody = document.getElementById('searchRows');
+    tbody.innerHTML = '<tr><td colspan="5" style="color:#64748b;padding:12px;text-align:center">Commencez à taper pour rechercher des produits...</td></tr>';
+  });
+  document.getElementById('closeSearch').addEventListener('click', function(){ modal.style.display='none'; });
+  
+  // Real-time search with debouncing
+  let searchTimeout;
+  document.getElementById('searchInput').addEventListener('input', function(){
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(doSearch, 300); // Wait 300ms after user stops typing
+  });
+  
+  // Also search when type changes
+  document.getElementById('searchType').addEventListener('change', doSearch);
+  async function doSearch(){
+    const q = document.getElementById('searchInput').value||'';
+    const type = document.getElementById('searchType').value||'all';
+    const tbody = document.getElementById('searchRows');
+    
+    // Show loading state
+    tbody.innerHTML = '<tr><td colspan="5" style="color:#64748b;padding:12px;text-align:center">Recherche en cours...</td></tr>';
+    
+    try {
+      const resp = await fetch(searchUrl+'?q='+encodeURIComponent(q)+'&type='+encodeURIComponent(type));
+      const out = await resp.json();
+      
+      if(!(out&&out.ok)){ 
+        tbody.innerHTML='<tr><td colspan="5" style="color:#b91c1c;padding:12px">Erreur de recherche</td></tr>'; 
+        return; 
+      }
+      
+      if(out.rows.length === 0) {
+        tbody.innerHTML='<tr><td colspan="5" style="color:#64748b;padding:12px;text-align:center">Aucun produit trouvé</td></tr>';
+        return;
+      }
+      
+      tbody.innerHTML = out.rows.map(r=>`<tr>
+        <td style="font-weight:800">${r.name}</td>
+        <td>${r.brand||'—'}</td>
+        <td>${r.remaining_qty}</td>
+        <td>${r.alert_qty}</td>
+        <td><button class="btn" data-add="${r.product_id}">Ajouter</button></td>
+      </tr>`).join('');
+      
+      // wire add/remove buttons and toggle state
+      tbody.querySelectorAll('button[data-add]').forEach(btn => {
+        const pid = parseInt(btn.dataset.add||'0',10);
+        const exists = document.querySelector('.kp-table tbody input.pick[data-pid="'+pid+'"]');
+        btn.dataset.mode = exists ? 'remove' : 'add';
+        btn.textContent = exists ? 'Retirer' : 'Ajouter';
+
+        btn.addEventListener('click', function(){
+          const id = parseInt(this.dataset.add||'0',10);
+          const mainTbody = document.querySelector('.kp-table tbody');
+          if (this.dataset.mode === 'add') {
+            const tr = this.closest('tr');
+            const row = document.createElement('tr');
+            row.innerHTML = `<td><input class=\"pick\" type=\"checkbox\" data-pid=\"${id}\" checked /></td>
+              <td style=\"font-weight:800\">${tr.children[0].textContent}</td>
+              <td>${tr.children[1].textContent}</td>
+              <td><span class=\"pill-low\">Ajouté</span></td>
+              <td>${tr.children[2].textContent}</td>
+              <td>${tr.children[3].textContent}</td>
+              <td><input class=\"input input-qty qty\" type=\"number\" min=\"1\" value=\"1\" /></td>
+              <td><button class=\"btn btn-sm\" data-remove-row data-pid=\"${id}\">Retirer</button></td>`;
+            mainTbody.appendChild(row);
+            row.querySelector('input.pick').addEventListener('change', compute);
+            row.querySelector('input.qty').addEventListener('input', compute);
+            // wire remove for newly added row
+            row.querySelector('button[data-remove-row]').addEventListener('click', function(){
+              const rr = this.closest('tr');
+              if (rr) rr.remove();
+              compute();
+            });
+            compute();
+            this.dataset.mode = 'remove';
+            this.textContent = 'Retirer';
+          } else {
+            const el = document.querySelector('.kp-table tbody input.pick[data-pid="'+id+'"]');
+            if (el) {
+              const r = el.closest('tr');
+              if (r) r.remove();
+              compute();
+            }
+            this.dataset.mode = 'add';
+            this.textContent = 'Ajouter';
+          }
+        });
+      });
+    } catch(e) {
+      tbody.innerHTML='<tr><td colspan="5" style="color:#b91c1c;padding:12px">Erreur de connexion</td></tr>';
+    }
+  }
+});
+</script>
+{% endblock %}
+
+{% if paginator %}
+<div class="pagination" style="display:flex;justify-content:center;align-items:center;gap:8px;margin:14px 0;">
+  {% if page.has_previous %}
+    <a class="btn" href="?type={{ kind }}&q={{ q }}&per_page={{ per_page }}&page=1">« Première</a>
+    <a class="btn" href="?type={{ kind }}&q={{ q }}&per_page={{ per_page }}&page={{ page.previous_page_number }}">‹ Précédente</a>
+  {% else %}
+    <span class="btn" style="opacity:.5;pointer-events:none;">« Première</span>
+    <span class="btn" style="opacity:.5;pointer-events:none;">‹ Précédente</span>
+  {% endif %}
+  <span class="btn" style="background:var(--brand);color:#fff;border-color:var(--brand)">Page {{ page.number }} / {{ paginator.num_pages }}</span>
+  {% if page.has_next %}
+    <a class="btn" href="?type={{ kind }}&q={{ q }}&per_page={{ per_page }}&page={{ page.next_page_number }}">Suivante ›</a>
+    <a class="btn" href="?type={{ kind }}&q={{ q }}&per_page={{ per_page }}&page={{ paginator.num_pages }}">Dernière »</a>
+  {% else %}
+    <span class="btn" style="opacity:.5;pointer-events:none;">Suivante ›</span>
+    <span class="btn" style="opacity:.5;pointer-events:none;">Dernière »</span>
+  {% endif %}
+</div>
+{% endif %}
+
+

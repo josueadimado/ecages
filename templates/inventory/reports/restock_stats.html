@@ -1,0 +1,43 @@
+{% extends "layouts/base_sales.html" %}
+{% block title %}Statistiques de ravitaillement | ECAGES{% endblock %}
+{% block content %}
+<div class="page" style="padding:16px;">
+  <h2 style="margin:0 0 12px;">Statistiques de ravitaillement</h2>
+  <div style="display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; margin-bottom:12px;">
+    <form method="get" style="display:flex; gap:.5rem; align-items:center; flex-wrap:wrap;">
+      <label>Du <input type="date" name="from" value="{{ date_from|default:'' }}"></label>
+      <label>Au <input type="date" name="to" value="{{ date_to|default:'' }}"></label>
+      <button class="btn" type="submit">Filtrer</button>
+      <a class="btn" href="?from=&to=">Aujourd'hui</a>
+    </form>
+  </div>
+  <div style="color:#64748b; font-weight:700; margin-bottom:8px;">
+    Période: {{ date_from|default:"—" }} - {{ date_to|default:"—" }}
+  </div>
+  <div class="card" style="background:#fff; border:1px solid #e5e7eb; border-radius:12px; overflow:auto;">
+    <table style="width:100%; border-collapse:separate; border-spacing:0; min-width:720px;">
+      <thead>
+        <tr style="background:#fafafa;">
+          <th style="text-align:left; padding:.6rem .8rem;">Date</th>
+          <th style="text-align:left; padding:.6rem .8rem;">Point de vente</th>
+          <th style="text-align:left; padding:.6rem .8rem;">Produits</th>
+          <th style="text-align:right; padding:.6rem .8rem;">Quantité totale</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td style="padding:.6rem .8rem;">{{ r.created_at|date:"d/m/Y" }}</td>
+          <td style="padding:.6rem .8rem;">{{ r.salespoint.name }}</td>
+          <td style="padding:.6rem .8rem;">{{ r.lines.count }}</td>
+          <td style="padding:.6rem .8rem; text-align:right;">{{ r.total_quantity }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" style="padding:1rem; color:#64748b; font-weight:700;">Aucune donnée pour la période.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div style="margin-top:10px; color:#111827; font-weight:800;">Quantité totale: {{ total_qty }}</div>
+</div>
+{% endblock %}

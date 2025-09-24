@@ -1,0 +1,359 @@
+{% extends "layouts/base_cashier.html" %}
+{% load static %}
+
+{% block title %}Rapport du jour — Caisse | ECAGES{% endblock %}
+{% block nav_report_active %}active{% endblock %}
+
+{% block extra_css %}
+  :root {
+    --brand:#580706; --ink:#0f172a; --muted:#64748b; --ring:#e5e7eb; --bg:#f8fafc; --card:#ffffff; --shadow:0 10px 30px rgba(2,8,23,.06);
+  }
+  html, body{ background: var(--bg); }
+  .container{ width:100%; max-width:none; margin:0; padding:18px 16px 28px; }
+  .card{ background:var(--card); border:1px solid var(--ring); border-radius:14px; box-shadow:var(--shadow); }
+
+  /* Header */
+  .pagehead{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; margin-bottom:14px; }
+  .title{ font-weight:900; color:var(--ink); letter-spacing:.2px; }
+  .chip{ background: linear-gradient(180deg,#7b0d0d,var(--brand)); color:#fff; padding:.35rem .7rem; border-radius:999px; font-weight:900; letter-spacing:.15px; border:1px solid rgba(255,255,255,.25); }
+
+  /* Toolbar / Filters */
+  .toolbar{ display:grid; grid-template-columns: 1fr auto; align-items:end; gap:12px; padding:12px 14px; margin-bottom:14px; }
+  .filters{ display:flex; flex-wrap:wrap; gap:10px; align-items:end; }
+  .filters .field{ margin:0; }
+  .filters .label{ margin-bottom:.25rem; }
+  .filters .input, .filters .select{ background:#fff; }
+  .filters .btn{ background:#fff; border:1px solid var(--ring); }
+  .filters .btn-primary{ background:var(--brand); color:#fff; border-color:transparent; }
+  .filters .btn-ghost{ background:transparent; border:1px solid var(--ring); }
+
+  /* Presets & export */
+  .presets{ display:flex; gap:8px; align-items:flex-end; }
+  .btn-sm{ padding:.45rem .7rem; border-radius:8px; font-weight:800; font-size:.9rem; }
+  .toolbar .rightside{ display:flex; gap:10px; align-items:center; }
+
+  /* Grid alignment for toolbar */
+  .rightside{ display:flex; gap:10px; align-items:center; justify-content:end; align-self:end; justify-self:end; }
+
+  @media (max-width: 900px){
+    .toolbar{ grid-template-columns: 1fr; align-items:start; }
+    .rightside{ justify-self:end; }
+    .filters{ justify-content:flex-start; }
+  }
+
+  /* Layout */
+  .grid-2{ display:grid; grid-template-columns: 420px 1fr; gap:16px; }
+  @media (max-width: 1024px){ .grid-2{ grid-template-columns: 1fr; } }
+
+  /* Form */
+  .form{ padding:14px 16px; }
+  .field{ margin-bottom:12px; }
+  .label{ display:block; font-weight:800; color:var(--muted); margin-bottom:.35rem; }
+  .input{ width:100%; background:#f9fafb; border:1px solid var(--ring); border-radius:10px; padding:.6rem .75rem; font-weight:700; }
+  .hint{ color:var(--muted); font-size:.9rem; margin-top:.35rem; }
+  .actions{ display:flex; gap:10px; justify-content:flex-end; margin-top:10px; }
+  .btn{ display:inline-flex; align-items:center; gap:8px; padding:.65rem 1rem; border-radius:10px; font-weight:900; border:1px solid var(--ring); background:#fff; }
+  .btn-primary{ background:var(--brand); color:#fff; border-color:transparent; }
+  .btn-primary:hover{ background:#6a0808; }
+
+  /* Table */
+  .tablecard{ overflow:auto; }
+  .thead{ background: rgba(88,7,6,.035); }
+  table.tbl{ width:100%; border-collapse:separate; border-spacing:0; min-width:720px; }
+  table.tbl th{ color:#475569; text-align:left; font-size:.85rem; font-weight:900; padding:.7rem .9rem; border-bottom:1px solid #e5e7eb; position:sticky; top:0; z-index:1; }
+  table.tbl th.right{ text-align:right; }
+  table.tbl td.right, table.tbl td.right strong{ font-variant-numeric: tabular-nums; text-align:right; }
+  table.tbl td{ padding:.75rem .9rem; border-bottom:1px solid #f1f5f9; }
+  .right{text-align:right;}
+  .badge{ display:inline-block; padding:.25rem .6rem; border-radius:999px; font-weight:800; font-size:.78rem; }
+  .b-pending{ background:#fff7ed; color:#b45309; }
+  .b-approved{ background:#ecfdf5; color:#047857; }
+  .b-rejected{ background:#fef2f2; color:#b91c1c; }
+
+  .empty{ color:var(--muted); text-align:center; padding:12px 16px; }
+
+  /* Modal */
+  .modal{position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(15,23,42,.25); z-index:200;}
+  .modal.show{display:flex;}
+  .sheet{width:min(520px,95vw); background:#fff; border:1px solid var(--ring); border-radius:16px; box-shadow:0 30px 60px rgba(2,8,23,.18); overflow:hidden;}
+  .sheet .hd{display:flex; align-items:center; justify-content:space-between; padding:12px 14px; background:linear-gradient(135deg,#fff,#fafafa); border-bottom:1px solid var(--ring);}
+  .sheet .bd{padding:14px 16px;}
+  .sheet .ft{padding:12px 14px; display:flex; gap:8px; justify-content:flex-end; border-top:1px solid var(--ring);}  
+  .btn-outline{ background:#fff; color:var(--brand); border:1px solid var(--brand); }
+  .btn-danger{ background:#b91c1c; color:#fff; border-color:transparent; }
+{% endblock %}
+
+{% block content %}
+  <div class="container">
+
+    <!-- Page header -->
+    <div class="card pagehead">
+      <div class="title">Rapport du jour — Caisse</div>
+      <span class="chip">Enregistrement</span>
+    </div>
+
+    <!-- Toolbar / Filters -->
+    <div class="card toolbar">
+      <form method="get" action="{% url 'sales:cashier_report' %}" class="filters">
+        <div class="field">
+          <label for="f_from" class="label">Du</label>
+          <input id="f_from" name="from" type="date" class="input" value="{{ f_from }}" />
+        </div>
+        <div class="field">
+          <label for="f_to" class="label">Au</label>
+          <input id="f_to" name="to" type="date" class="input" value="{{ f_to }}" />
+        </div>
+        <div class="field">
+          <label for="f_status" class="label">Statut</label>
+          <select id="f_status" name="status" class="input select">
+            <option value="" {% if not f_status %}selected{% endif %}>Tous</option>
+            <option value="pending"  {% if f_status == 'pending' %}selected{% endif %}>En attente</option>
+            <option value="approved" {% if f_status == 'approved' %}selected{% endif %}>Approuvée</option>
+            <option value="rejected" {% if f_status == 'rejected' %}selected{% endif %}>Rejetée</option>
+          </select>
+        </div>
+        <div class="field presets">
+          <span class="label" style="margin:0; align-self:center;">Préréglages</span>
+          <button type="button" class="btn btn-sm btn-ghost" data-preset="today">Aujourd'hui</button>
+          <button type="button" class="btn btn-sm btn-ghost" data-preset="week">Cette semaine</button>
+          <button type="button" class="btn btn-sm btn-ghost" data-preset="month">Ce mois-ci</button>
+        </div>
+        <div class="field" style="display:flex; gap:8px;">
+          <button class="btn btn-primary" type="submit">Filtrer</button>
+          <a class="btn" href="{% url 'sales:cashier_report' %}">Réinitialiser</a>
+        </div>
+      </form>
+      <div class="rightside">
+        <button id="btnExportCsv" type="button" class="btn btn-sm">Exporter (.csv)</button>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <!-- LEFT: Form -->
+      <div class="card">
+        <form class="form" method="post" id="reportForm">
+          {% csrf_token %}
+          <div class="field">
+            <label for="report_date" class="label">Date du rapport</label>
+            <input class="input" type="date" name="report_date" id="report_date" value="{{ selected_date|date:'Y-m-d' }}" required>
+          </div>
+          <div class="field">
+            <label for="total_amount" class="label">Montant total (FCFA)</label>
+            <input class="input" type="text" inputmode="numeric" name="total_amount" id="total_amount" placeholder="Ex: 150 000" autocomplete="off" required>
+            <div class="hint">Saisissez le cumul des ventes encaissées pour la journée choisie.</div>
+          </div>
+          <div class="actions">
+            <button class="btn btn-primary" type="submit">Valider le rapport</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- RIGHT: History table -->
+      <div class="card tablecard">
+        <table class="tbl">
+          <thead class="thead">
+            <tr>
+              <th>Date</th>
+              <th class="right">Montant (FCFA)</th>
+              <th>Statut</th>
+              <th>Créé le</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in rows %}
+              <tr data-date="{{ r.report_date|date:'Y-m-d' }}" data-status="{{ r.status }}" data-amount="{{ r.total_amount|floatformat:0 }}">
+                <td>{{ r.report_date|date:"d/m/Y" }}</td>
+                <td class="right"><strong>{{ r.total_amount|floatformat:0 }}</strong></td>
+                <td>
+                  {% if r.status == "approved" %}<span class="badge b-approved">Approuvée</span>
+                  {% elif r.status == "rejected" %}<span class="badge b-rejected">Rejetée</span>
+                  {% else %}<span class="badge b-pending">En attente</span>
+                  {% endif %}
+                </td>
+                <td>{{ r.created_at|date:"d/m/Y H:i" }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="4" class="empty">Aucun rapport saisi.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONFIRM MODAL -->
+  <div id="confirmModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="cfTitle">
+    <div class="sheet">
+      <div class="hd">
+        <div class="title" id="cfTitle">Confirmer le rapport</div>
+        <button class="btn btn-outline" data-close="#confirmModal">✕</button>
+      </div>
+      <div class="bd">
+        <p class="muted">Date: <strong id="cfDate">—</strong></p>
+        <p class="muted">Montant saisi: <strong id="cfAmount">—</strong></p>
+      </div>
+      <div class="ft">
+        <button class="btn" data-close="#confirmModal">Annuler</button>
+        <button id="cfSubmit" class="btn btn-primary">Valider & enregistrer</button>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+  const form = document.getElementById('reportForm');
+  const inputAmt = document.getElementById('total_amount');
+  const inputDate = document.getElementById('report_date');
+  const UX = window.ECAGES || {};
+  const fFrom = document.getElementById('f_from');
+  const fTo = document.getElementById('f_to');
+
+  // format amount with spaces while typing (keeps numbers only)
+  function digits(s){ return (s||'').replace(/[^0-9]/g,''); }
+  function pretty(n){ if(!n) return ''; return Number(n).toLocaleString('fr-FR'); }
+  inputAmt.addEventListener('input', ()=>{
+    const raw = digits(inputAmt.value);
+    inputAmt.value = pretty(raw);
+  });
+
+  // preset date helpers
+  function fmt(d){ return d.toISOString().slice(0,10); }
+  function startOfWeek(d){
+    const dt = new Date(d); const day = dt.getDay(); // 0=Sun .. 6=Sat
+    const diff = (day === 0 ? -6 : 1) - day; // make Monday start
+    dt.setDate(dt.getDate() + diff);
+    dt.setHours(0,0,0,0); return dt;
+  }
+  function endOfWeek(d){
+    const s = startOfWeek(d); const e = new Date(s); e.setDate(s.getDate()+6); return e;
+  }
+  function startOfMonth(d){ const dt=new Date(d); dt.setDate(1); return dt; }
+  function endOfMonth(d){ const dt=new Date(d); dt.setMonth(dt.getMonth()+1,0); return dt; }
+
+  // modal helpers
+  const $ = (s)=>document.querySelector(s);
+  function openModal(id){ $(id).classList.add('show'); }
+  function closeModal(id){ $(id).classList.remove('show'); }
+  document.querySelectorAll('[data-close]').forEach(b=> b.addEventListener('click', ()=> closeModal(b.getAttribute('data-close'))));
+  document.getElementById('confirmModal')?.addEventListener('click', (e)=>{ if(e.target.id==='confirmModal') closeModal('#confirmModal'); });
+
+  // bind presets
+  document.querySelectorAll('[data-preset]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const kind = btn.getAttribute('data-preset');
+      const now = new Date();
+      let a = now, b = now;
+      if(kind === 'today'){
+        a = now; b = now;
+      }else if(kind === 'week'){
+        a = startOfWeek(now); b = endOfWeek(now);
+      }else if(kind === 'month'){
+        a = startOfMonth(now); b = endOfMonth(now);
+      }
+      if(fFrom) fFrom.value = fmt(a);
+      if(fTo) fTo.value = fmt(b);
+      // submit the GET filter form
+      btn.closest('form')?.submit();
+    });
+  });
+
+  // API check for sales on chosen date
+  async function fetchSummary(d){
+    const url = "{% url 'sales:sales_api_cashier_sales_summary' %}?d=" + encodeURIComponent(d);
+    const r = await fetch(url);
+    if(!r.ok) throw new Error('HTTP');
+    return r.json(); // {count, total}
+  }
+
+  form.addEventListener('submit', async function(e){
+    e.preventDefault();
+    const d = inputDate.value; const raw = digits(inputAmt.value);
+    if(!raw){ alert('Veuillez saisir un montant.'); return; }
+
+    try{
+      UX.startProgress && UX.startProgress();
+      UX.showLoader && UX.showLoader(true);
+
+      const sum = await fetchSummary(d);
+
+      UX.showLoader && UX.showLoader(false);
+      UX.doneProgress && UX.doneProgress();
+
+      if((sum.count||0) === 0){
+        alert("Aucune vente enregistrée dans le système pour cette date.");
+        return;
+      }
+
+      // fill modal
+      document.getElementById('cfDate').textContent = d;
+      document.getElementById('cfAmount').textContent = 'FCFA ' + pretty(raw);
+      openModal('#confirmModal');
+
+      // on confirm, submit the cleaned value
+      const btn = document.getElementById('cfSubmit');
+      const once = ()=>{
+        btn.removeEventListener('click', once);
+        const hidden = document.createElement('input');
+        hidden.type='hidden'; hidden.name='total_amount'; hidden.value=raw;
+        inputAmt.setAttribute('name','_display_amount');
+        form.appendChild(hidden);
+        UX.showLoader && UX.showLoader(true);
+        UX.startProgress && UX.startProgress();
+        form.submit();
+      };
+      btn.addEventListener('click', once);
+    }catch(err){
+      UX.showLoader && UX.showLoader(false);
+      UX.doneProgress && UX.doneProgress();
+      alert("Impossible de vérifier les ventes pour cette date.");
+    }
+  });
+
+  // CSV export (current table)
+  function toCsvValue(s){
+    const v = (s||'').toString().replaceAll('\u00A0',' ').trim();
+    if(v.includes(';') || v.includes('"') || v.includes('\n')){
+      return '"' + v.replaceAll('"','""') + '"';
+    }
+    return v;
+  }
+  function buildCsv(){
+    const table = document.querySelector('table.tbl');
+    if(!table) return '';
+    const rows = [];
+    const hdrs = Array.from(table.querySelectorAll('thead th')).map(th=>th.innerText.trim());
+    rows.push(hdrs.join(';'));
+    table.querySelectorAll('tbody tr').forEach(tr=>{
+      if(tr.querySelector('.empty')) return; // skip placeholder row
+      const cols = Array.from(tr.querySelectorAll('td')).map(td=> toCsvValue(td.innerText));
+      rows.push(cols.join(';'));
+    });
+    return '\ufeff' + rows.join('\n'); // BOM for Excel (FR locale)
+  }
+  function currentRangeLabel(){
+    const a = fFrom?.value || ''; const b = fTo?.value || '';
+    if(a && b) return a.replaceAll('-','') + '-' + b.replaceAll('-','');
+    if(a) return a.replaceAll('-',''); if(b) return b.replaceAll('-','');
+    return new Date().toISOString().slice(0,10).replaceAll('-','');
+  }
+  document.getElementById('btnExportCsv')?.addEventListener('click', ()=>{
+    try{
+      const csv = buildCsv();
+      if(!csv){ alert('Tableau introuvable.'); return; }
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'rapport_caisse_' + currentRangeLabel() + '.csv';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }catch(err){
+      alert('Export impossible.');
+    }
+  });
+
+})();
+</script>
+{% endblock %}

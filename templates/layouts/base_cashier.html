@@ -1,0 +1,322 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}Caisse — ECAGES{% endblock %}</title>
+  <!-- Tailwind (Play CDN) for rapid, clean UI without build step -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: { colors: { brand: '#580706' } } } }
+  </script>
+  <!-- Inter font for nicer typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      /* Neutral, quiet palette */
+      --bg: #f7f7f8;
+      --surface: #ffffff;
+      --ink: #0f172a;
+      --muted: #6b7280;
+      --ring: #e5e7eb;
+      --line: #edf0f2;
+      --accent: #580706;
+      --accent-ink: #3c0404;
+      --brand: #580706;
+      --brand-rgb: 88, 7, 6;
+      --shadow: 0 8px 24px rgba(2, 8, 23, .06);
+      --radius: 12px;
+      --sbw: 240px;
+      --sbw-collapsed: 68px;
+      --font: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    }
+
+    html, body { height:100%; margin:0; font-family: var(--font); background: var(--bg); color: var(--ink); }
+
+    /* Topbar: neutral surface with subtle divider */
+    .topbar { position: sticky; top: 0; z-index: 40; background: var(--surface); border-bottom: 1px solid var(--line); }
+    /* Tighten topbar edges so brand hugs left and logout hugs right */
+    .topbar-inner { padding-left: 8px; padding-right: 8px; }
+    @media (min-width: 640px) { /* sm */
+      .topbar-inner { padding-left: 12px; padding-right: 12px; }
+    }
+    @media (min-width: 1024px) { /* lg */
+      .topbar-inner { padding-left: 14px; padding-right: 14px; }
+    }
+    .brand { display:flex; align-items:center; gap:10px; font-weight: 800; letter-spacing:.2px; }
+    .brand .logo { display:grid; place-items:center; width:36px; height:36px; border-radius:10px; border:1px solid var(--ring); }
+    .brand .word { font-size: 1.05rem; }
+
+    .toggle { border:1px solid var(--ring); background: var(--surface); border-radius: 10px; padding: 6px 8px; cursor: pointer; }
+    .toggle:hover { background: #fafafa; }
+
+    .profile { display:flex; align-items:center; gap:10px; }
+    .avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--brand); border:1px solid var(--ring); display:grid; place-items:center; font-weight:800; color: #fff; box-shadow: 0 2px 6px rgba(88,7,6,0.5); }
+    .who { line-height: 1.2; }
+    .who .name { font-weight: 800; font-size: .95rem; max-width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .logout { border:none; border-radius: 10px; padding: 6px 10px; background: var(--brand); color: #fff; font-weight: 700; cursor: pointer; }
+    .logout:hover { background: #460504; }
+
+    /* Layout */
+    .wrap { display:flex; min-height: calc(100vh - 53px); }
+
+    /* Sidebar: simple surface, quiet hover, clear active */
+    .sidebar { position: sticky; top: 53px; height: calc(100vh - 53px); width: var(--sbw); background: var(--surface); border-right:1px solid var(--line); transition: width .2s ease, transform .2s ease; }
+    .sidebar.collapsed { width: var(--sbw-collapsed); }
+    .sb-inner { padding: 12px; display:flex; flex-direction: column; gap: 6px; }
+    .sb-item { display:flex; align-items:center; gap:10px; padding: 10px 12px; border-radius: 10px; text-decoration:none; color: var(--ink); font-weight: 700; }
+    .sb-icon { width: 18px; height: 18px; display:grid; place-items:center; }
+    .sb-item:hover { background:#f5f6f8; }
+    .sb-item.active { background: rgba(var(--brand-rgb), .06); border:1px solid rgba(var(--brand-rgb), .25); }
+    .sb-label { white-space: nowrap; }
+    .sidebar.collapsed .sb-label { display:none; }
+
+    /* Main */
+    .content { flex:1; min-width:0; }
+    .content-pad { margin: 0 auto; padding: 16px 18px 24px; }
+
+    /* Expand inner page content to full width */
+    .content-pad { max-width: 100% !important; }
+    .content-pad > .container { max-width: 100% !important; width: 100% !important; }
+    .content-pad [class*="max-w-"] { max-width: 100% !important; }
+    .content-pad .w-full { width: 100% !important; }
+    .content-pad .card { width: 100%; }
+
+    /* Brand marquee ribbon */
+    .ribbon { background: linear-gradient(180deg, #6e0a0a, var(--brand)); color:#fff; border-radius:18px; padding:24px 32px; text-align:center; font-weight:900; letter-spacing:.3px; box-shadow: var(--shadow); border: 1px solid rgba(0,0,0,.05); overflow:hidden; margin-bottom: 12px; }
+    .marquee { position: relative; width: 100%; overflow: hidden; }
+    .marquee span { display:inline-block; padding-left:100%; white-space:nowrap; animation: scrollLeft 18s linear infinite; font-size: 1.5rem; }
+    @keyframes scrollLeft { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
+
+    /* Page header (marquee simplified to a quiet card with live clock) */
+    /* Utilities */
+    .card { background: var(--surface); border:1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+    .btn { border:1px solid var(--ring); background: var(--surface); padding: 8px 10px; border-radius: 10px; font-weight: 800; cursor: pointer; }
+    .btn:hover { background:#fafafa; }
+    .btn-primary { background: var(--brand); color: #fff; border-color: var(--brand); }
+
+    /* Responsive */
+    @media (max-width: 720px) {
+      .sidebar { position: fixed; top: 53px; left: 0; transform: translateX(-100%); width: var(--sbw); box-shadow: var(--shadow); }
+      .sidebar.show { transform: translateX(0); }
+      .content-pad { padding: 12px 10px 20px; }
+    }
+
+    /* Top progress bar */
+    .progressbar { position: fixed; top: 0; left: 0; height: 3px; width: 0; background: linear-gradient(90deg, #a21d1d, var(--brand)); box-shadow: 0 1px 6px rgba(88,7,6,.4); z-index: 9999; transition: width .8s ease; }
+    .progressbar.show { width: 60%; }
+    .progressbar.done { width: 100%; }
+
+    /* Overlay loader (with fade transition) */
+    .overlay-loader { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(255,255,255,.55); backdrop-filter: blur(2px); z-index: 9998; opacity: 0; transition: opacity .25s ease; }
+    .overlay-loader.show { display: flex; opacity: 1; }
+    .spinner { width: 54px; height: 54px; border: 4px solid #e5e7eb; border-top-color: var(--brand); border-radius: 50%; animation: spin 1.4s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    {% block extra_css %}{% endblock %}
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <div id="topProgress" class="progressbar" aria-hidden="true"></div>
+  <div id="overlayLoader" class="overlay-loader" aria-live="polite" aria-busy="true">
+    <div class="spinner" role="status" aria-label="Chargement"></div>
+  </div>
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="topbar-inner w-full h-14 flex items-center justify-between gap-3">
+      <!-- Left: Brand -->
+      <div class="brand flex items-center gap-2">
+        <button id="btnSidebar" class="toggle" title="Menu">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h16" stroke="#111827" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <div class="word text-xl font-extrabold tracking-tight">
+          <span class="text-[#0f172a]">Eca</span><span class="text-[#580706]">Ges</span>
+        </div>
+      </div>
+      <!-- Right: Profile + Logout -->
+      <div class="profile flex items-center gap-3">
+        <div class="avatar ring-1 ring-white/40 shadow">{{ request.user.get_short_name|default:request.user.username|first|upper }}</div>
+        <div class="who">
+          <div class="name">{{ request.user.get_full_name|default:request.user.username }}</div>
+        </div>
+        <a class="logout inline-flex items-center justify-center gap-2 border border-[#580706] bg-white hover:bg-[#580706] hover:text-white text-[#580706] font-bold h-9 px-4 rounded-lg shadow-sm transition" href="{% url 'logout' %}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 17l5-5-5-5M20 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M13 5V4a2 2 0 00-2-2H5a2 2 0 00-2 2v16a2 2 0 002 2h6a2 2 0 002-2v-1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Déconnexion
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="sidebar">
+      <div class="sb-inner">
+        <a href="{% url 'sales:cashier_dashboard' %}" class="sb-item transition hover:shadow-sm {% block nav_dashboard_active %}{% endblock %}">
+          <span class="sb-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 11.5L12 4l9 7.5" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 10v10h14V10" stroke="#475569" stroke-width="2" stroke-linecap="round"/></svg>
+          </span>
+          <span class="sb-label">Tableau de bord</span>
+        </a>
+        <a href="{% url 'sales:cashier_journal' %}" class="sb-item transition hover:shadow-sm {% block nav_journal_active %}{% endblock %}">
+          <span class="sb-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h16" stroke="#475569" stroke-width="2" stroke-linecap="round"/></svg>
+          </span>
+          <span class="sb-label">Journal des ventes</span>
+        </a>
+        <a href="{% url 'sales:cashier_report' %}" class="sb-item transition hover:shadow-sm {% block nav_report_active %}{% endblock %}">
+          <span class="sb-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 19V5a2 2 0 012-2h8l6 6v10a2 2 0 01-2 2H6a2 2 0 01-2-2z" stroke="#475569" stroke-width="2"/><path d="M14 3v6h6" stroke="#475569" stroke-width="2"/></svg>
+          </span>
+          <span class="sb-label">Rapport du jour</span>
+        </a>
+        <a href="{% url 'logout' %}" class="sb-item" style="margin-top:8px; color:var(--accent-ink)">
+          <span class="sb-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 17l5-5-5-5M20 12H9" stroke="#7c0a0a" stroke-width="2" stroke-linecap="round"/><path d="M13 5V4a2 2 0 00-2-2H5a2 2 0 00-2 2v16a2 2 0 002 2h6a2 2 0 002-2v-1" stroke="#7c0a0a" stroke-width="2" stroke-linecap="round"/></svg>
+          </span>
+          <span class="sb-label">Déconnexion</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="content">
+      <div class="content-pad">
+        <div class="ribbon shadow-md"><div class="marquee"><span id="ribbonText" class="tracking-wide"></span></div></div>
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+  </div>
+
+  <script>
+    (function(){
+      const sidebar = document.getElementById('sidebar');
+      const btn = document.getElementById('btnSidebar');
+      const ribbon = document.getElementById('ribbonText');
+
+      // Mobile sidebar toggle
+      function isMobile(){ return matchMedia('(max-width: 720px)').matches }
+      function toggle(){
+        if (isMobile()) sidebar.classList.toggle('show');
+        else sidebar.classList.toggle('collapsed');
+      }
+      btn && btn.addEventListener('click', toggle);
+
+      // Live clock
+      function tick(){
+        const d=new Date();
+        const pad=n=>n<10?('0'+n):n;
+        const cap=s=>s? s.charAt(0).toUpperCase()+s.slice(1):s;
+        const dateStr = cap(d.toLocaleDateString('fr-FR',{weekday:'long',year:'numeric',month:'long',day:'numeric'}));
+        const timeStr = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+        const spName = `{{ salespoint.name|default:'—' }}`;
+        if (ribbon) ribbon.textContent = `ECAGES • ${spName} • ${dateStr} — ${timeStr}   \u00A0\u00A0\u00A0`;
+      }
+      tick(); setInterval(tick, 1000);
+
+      // ===== Global loaders (smoothed) =====
+      const topProgress = document.getElementById('topProgress');
+      const overlay = document.getElementById('overlayLoader');
+      let progTimer = null;      // hides the bar after completion
+      let progInterval = null;   // advances the bar while loading
+      let progVal = 0;           // current %
+      let progStart = 0;         // ms epoch when started
+
+      function setBar(p){ if(topProgress) topProgress.style.width = Math.max(0, Math.min(100, p)) + '%'; }
+
+      function startProgress(){
+        if (!topProgress) return; 
+        // clear any existing timers
+        clearTimeout(progTimer); progTimer = null;
+        clearInterval(progInterval); progInterval = null;
+        progVal = 0; setBar(0);
+        topProgress.classList.remove('done');
+        progStart = Date.now();
+        // kick off animation frame to add class for CSS transition
+        requestAnimationFrame(()=>{
+          topProgress.classList.add('show');
+          progVal = 5; setBar(progVal);
+          // slowly advance toward 60% while work is pending
+          progInterval = setInterval(()=>{
+            if (progVal < 60) {
+              progVal += 2 + Math.random()*3; // +2% to +5%
+              if (progVal > 60) progVal = 60;
+              setBar(progVal);
+            }
+          }, 350);
+        });
+      }
+
+      function doneProgress(){
+        if (!topProgress) return;
+        clearInterval(progInterval); progInterval = null;
+        // ensure a minimum visible duration for perceived smoothness
+        const elapsed = Date.now() - (progStart || Date.now());
+        const minVisible = 1200; // ms
+        const finish = ()=>{
+          topProgress.classList.add('done');
+          setBar(100);
+          clearTimeout(progTimer);
+          progTimer = setTimeout(()=>{
+            topProgress.classList.remove('show','done');
+            setBar(0);
+          }, 400);
+        };
+        if (elapsed < minVisible) {
+          setTimeout(finish, minVisible - elapsed);
+        } else {
+          finish();
+        }
+      }
+
+      function showLoader(show){
+        if(!overlay) return;
+        if (show) {
+          overlay.classList.add('show');
+        } else {
+          // allow CSS fade-out to be seen
+          overlay.classList.remove('show');
+          // no further action needed; display will switch next time we show
+        }
+      }
+
+      // Expose helpers for pages to use
+      window.ECAGES = Object.assign(window.ECAGES || {}, { startProgress, doneProgress, showLoader });
+
+      // Auto-progress on internal nav clicks
+      function isInternal(href){
+        try { const u = new URL(href, window.location.href); return u.origin === window.location.origin; } catch { return false; }
+      }
+      document.addEventListener('click', (e)=>{
+        const a = e.target.closest('a[href]');
+        if(!a) return;
+        if (a.hasAttribute('data-no-loader') || a.target === '_blank' || a.download) return;
+        if (!isInternal(a.getAttribute('href'))) return;
+        // ignore anchors
+        const href = a.getAttribute('href');
+        if (href && href.startsWith('#')) return;
+        startProgress();
+      }, true);
+      window.addEventListener('pageshow', ()=> doneProgress());
+
+      // Show overlay loader on POST forms for better feedback
+      document.addEventListener('submit', (e)=>{
+        const form = e.target.closest('form');
+        if(!form) return;
+        // opt-out
+        if (form.hasAttribute('data-no-loader')) return;
+        // Only show for non-GET (POST/PUT/DELETE) or when explicitly requested via data-show-loader
+        const method = (form.getAttribute('method')||'get').toLowerCase();
+        if (method !== 'get' || form.hasAttribute('data-show-loader')) {
+          showLoader(true);
+          startProgress();
+        }
+      }, true);
+    })();
+  </script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

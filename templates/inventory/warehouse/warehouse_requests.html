@@ -1,0 +1,149 @@
+{% extends "layouts/base_sales.html" %}
+{% block title %}Demandes de réapprovisionnement | ECAGES{% endblock %}
+{% block extra_css %}
+  <style>
+    :root{ --ring:#e5e7eb; --muted:#64748b; }
+    .page{ padding:16px; }
+    .ribbon{ background:linear-gradient(180deg,#6e0a0a,var(--brand)); color:#fff; border-radius:18px; padding:18px 24px; font-weight:900; margin-bottom:12px; overflow:hidden; }
+    .marquee{ position:relative; width:100%; overflow:hidden; }
+    .marquee span{ display:inline-block; padding-left:100%; white-space:nowrap; animation: scrollLeft 18s linear infinite; font-size:1.35rem; }
+    @keyframes scrollLeft { 0%{transform:translateX(0)} 100%{transform:translateX(-100%)} }
+    .card{ background:#fff; border:1px solid var(--ring); border-radius:12px; box-shadow:0 8px 24px rgba(2,8,23,.06); }
+    .filters{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:12px 16px; }
+    .filters input, .filters select{ border:1px solid var(--ring); border-radius:10px; padding:.5rem .7rem; font-weight:700; background:#f9fafb; }
+    table.table{width:100%; border-collapse:separate; border-spacing:0; font-size:.98rem; min-width:960px;}
+    table.table th{position:sticky; top:0; background:#fafafa; text-align:left; font-size:.85rem; color:var(--muted); border-bottom:1px solid var(--ring); padding:.7rem .9rem; font-weight:900;}
+    table.table td{border-bottom:1px solid #f2f4f7; padding:.75rem .9rem;}
+    .badge{display:inline-block; padding:.22rem .55rem; border-radius:999px; font-weight:800; font-size:.78rem; border:1px solid var(--ring);}
+    .b-sent{background:#eef2ff; color:#3730a3}
+    .b-approved{background:#ecfdf5; color:#047857}
+    .b-rejected{background:#fef2f2; color:#b91c1c}
+    .b-fulfilled{background:#fff7ed; color:#b45309}
+    .b-draft{background:#f3f4f6; color:#111827}
+    .b-partially-validated{background:#fef3c7; color:#92400e}
+    .b-validated{background:#d1fae5; color:#065f46}
+    .btn{display:inline-flex; align-items:center; gap:6px; border:1px solid var(--ring); background:#fff; padding:.4rem .7rem; border-radius:8px; cursor:pointer; text-decoration:none; color:#111827; font-weight:700}
+    .btn:hover{background:#f9fafb}
+    .btn-primary{background:#111827; color:#fff; border-color:#111827}
+    .btn-primary:hover{background:#000; color:#fff}
+    .btn-secondary{background:#f3f4f6}
+    .btn-ghost{background:transparent}
+    .actions{display:flex; gap:8px; justify-content:flex-end;}
+    
+    /* Modal styles */
+    .modal{position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,.5); z-index:9999; display:none; align-items:center; justify-content:center; padding:20px;}
+    .modal.show{display:flex;}
+    .modal .sheet{background:#fff; border-radius:12px; box-shadow:0 20px 60px rgba(0,0,0,.3); max-width:90vw; max-height:90vh; overflow:hidden; display:flex; flex-direction:column;}
+    .modal .hd{display:flex; justify-content:space-between; align-items:center; padding:20px 24px; border-bottom:1px solid var(--ring); font-weight:900; font-size:1.1rem;}
+    .modal .bd{padding:24px; overflow:auto; flex:1;}
+    .modal .btn{min-width:auto; padding:.4rem .7rem;}
+  </style>
+{% endblock %}
+{% block content %}
+<div class="page">
+  <div class="ribbon"><div class="marquee"><span id="ribbonText">ECAGES • MAGASIN (DIRECTION GENERALE) • {{ "now"|date:"d/m/Y H:i" }}</span></div></div>
+  <div class="card" style="margin-bottom:14px;">
+    <form class="filters" method="get">
+      <input type="text" name="q" value="{{ q }}" placeholder="Recherche (point de vente, produit)…" />
+      <select name="status">
+        <option value="">Tous statuts</option>
+        <option value="draft" {% if status == 'draft' %}selected{% endif %}>Brouillon</option>
+        <option value="sent" {% if status == 'sent' %}selected{% endif %}>Envoyée</option>
+        <option value="approved" {% if status == 'approved' %}selected{% endif %}>Approuvée</option>
+        <option value="rejected" {% if status == 'rejected' %}selected{% endif %}>Rejetée</option>
+        <option value="fulfilled" {% if status == 'fulfilled' %}selected{% endif %}>Servie</option>
+        <option value="cancelled" {% if status == 'cancelled' %}selected{% endif %}>Annulée</option>
+      </select>
+      <input type="date" name="from" value="{{ date_from }}">
+      <input type="date" name="to" value="{{ date_to }}">
+      <button class="btn submit" type="submit">Appliquer</button>
+    </form>
+  </div>
+  <div class="card" style="overflow:auto;">
+    <table class="table">
+      <thead><tr><th>#</th><th>Référence</th><th>Point de vente</th><th>Demandé par</th><th>Statut</th><th>Date</th><th>Lignes</th><th class="right">Actions</th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>{{ r.id }}</td>
+          <td>{% if r.reference %}{{ r.reference }}{% else %}REQ-{{ r.id }}{% endif %}</td>
+          <td>{{ r.salespoint.name }}</td>
+          <td>{{ r.requested_by.get_full_name|default:r.requested_by.username }}</td>
+          <td>
+            {% if r.status == 'draft' %}<span class="badge b-draft">Brouillon</span>
+            {% elif r.status == 'sent' %}<span class="badge b-sent">Envoyée</span>
+            {% elif r.status == 'approved' %}<span class="badge b-approved">Approuvée</span>
+            {% elif r.status == 'rejected' %}<span class="badge b-rejected">Rejetée</span>
+            {% elif r.status == 'fulfilled' %}<span class="badge b-fulfilled">Servie</span>
+            {% elif r.status == 'partially_validated' %}<span class="badge b-partially-validated">Partiellement validé</span>
+            {% elif r.status == 'validated' %}<span class="badge b-validated">Validé</span>
+            {% else %}{{ r.status }}{% endif %}
+          </td>
+          <td>{{ r.created_at|date:"d/m/Y H:i" }}</td>
+          <td>{{ r.lines.count }}</td>
+          <td class="right">
+            <div class="actions">
+              <button class="btn btn-primary btn-detail" data-id="{{ r.id }}">Voir</button>
+              <a class="btn btn-secondary" href="{% url 'inventory:warehouse_request_print' r.id %}" target="_blank">Imprimer</a>
+              <button class="btn btn-ghost btn-copy" data-ref="{% if r.reference %}{{ r.reference }}{% else %}REQ-{{ r.id }}{% endif %}">Copier ref</button>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8" style="color:#64748b; padding:1rem .9rem; font-weight:700;">Aucune demande.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function(){
+  const el=document.getElementById('ribbonText'); if(!el) return;
+  function pad(n){return n<10?'0'+n:n;} function cap(s){return s? s.charAt(0).toUpperCase()+s.slice(1):s;}
+  function tick(){ const d=new Date(); const dateStr=cap(d.toLocaleDateString('fr-FR',{weekday:'long',year:'numeric',month:'long',day:'numeric'})); const timeStr=`${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; el.textContent=`ECAGES • MAGASIN (DIRECTION GENERALE) • ${dateStr} — ${timeStr}`; }
+  tick(); setInterval(tick,1000);
+
+  // Detail modal (basic)
+  function openModal(html){
+    let m=document.getElementById('reqModal');
+    if(!m){ m=document.createElement('div'); m.id='reqModal'; m.className='modal show'; m.innerHTML=`<div class="sheet"><div class="hd">Détail de la demande<button id="reqClose" class="btn">✕</button></div><div class="bd" id="reqBody"></div></div>`; document.body.appendChild(m); } else { m.classList.add('show'); }
+    document.getElementById('reqBody').innerHTML = html;
+    document.getElementById('reqClose').onclick=()=>m.classList.remove('show');
+    document.addEventListener('keydown',function esc(e){ if(e.key==='Escape'){ m.classList.remove('show'); document.removeEventListener('keydown', esc); } });
+  }
+  async function viewLines(id){
+    try{
+      const r = await fetch(`/inventory/warehouse/requests/${id}/lines/`, { headers: { 'Accept': 'application/json' } });
+      if(!r.ok){
+        const t = await r.text();
+        alert('Erreur serveur ('+r.status+'): '+ (t||'') );
+        return;
+      }
+      const res = await r.json();
+      if(!res.ok){ alert(res.error||'Erreur'); return; }
+      const head = `<div style="margin-bottom:8px; font-weight:800;">Demande ${res.reference||('#'+res.id)} • ${res.salespoint||''} • ${res.created_at||''}</div>`;
+      const rows = (res.lines||[]).map(li=>`<tr><td><strong>${li.name}</strong></td><td>${li.brand||''}</td><td>${li.remaining_qty||0}</td></tr>`).join('');
+      const html = head + `<div style="max-height:360px; overflow:auto;"><table class="table"><thead><tr><th>Produit</th><th>Marque</th><th>Stock restant (au moment de la demande)</th></tr></thead><tbody>${rows||'<tr><td colspan=3>Aucune ligne.</td></tr>'}</tbody></table></div>`;
+      openModal(html);
+    }catch(e){
+      alert('Erreur réseau. Veuillez réessayer.');
+    }
+  }
+  document.querySelectorAll('.btn-detail').forEach(b=>b.addEventListener('click',()=>viewLines(b.dataset.id)));
+  // Copy reference to clipboard
+  document.querySelectorAll('.btn-copy').forEach(b=>{
+    b.addEventListener('click', async ()=>{
+      try{
+        await navigator.clipboard.writeText(b.dataset.ref||'');
+        b.textContent='Copié!';
+        setTimeout(()=>{ b.textContent='Copier ref'; }, 1200);
+      }catch(e){ alert('Impossible de copier'); }
+    });
+  });
+})();
+</script>
+{% endblock %}
+
+

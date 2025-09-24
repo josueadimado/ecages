@@ -1,0 +1,1023 @@
+{% extends "layouts/base_sales.html" %}
+{% block title %}Entrepôt — Tableau de bord{% endblock %}
+{% block extra_css %}
+<style>
+  /* Align visuals with manager dashboard */
+  .card{background:#fff;border:1px solid var(--ring);border-radius:14px;box-shadow:0 10px 30px rgba(2,8,23,.06)}
+  .btn{border:1px solid var(--ring);border-radius:12px;background:#fff;padding:.45rem .8rem;font-weight:800}
+  .btn:hover{box-shadow:0 6px 16px rgba(0,0,0,.08)}
+  .btn-brand{background:var(--brand);color:#fff;border-color:transparent}
+  .btn-dark{background:#111827;color:#fff;border-color:transparent}
+  .btn-red{background:#dc2626;color:#fff;border-color:transparent}
+  .pills{display:flex;gap:.5rem;background:#fff;border:1px solid var(--ring);border-radius:999px;padding:.25rem}
+  .pill{padding:.42rem .9rem;border-radius:999px;font-weight:700;color:#111827;display:flex;align-items:center;gap:.35rem}
+  .pill input{display:none}
+  .pill.active{background:var(--brand);color:#fff}
+  .table{width:100%;border-collapse:separate;border-spacing:0;font-size:.94rem}
+  .table th{position:sticky;top:0;background:#fff;z-index:1;text-align:left;font-size:.78rem;color:var(--muted);border-bottom:1px solid var(--ring);padding:.6rem .75rem}
+  .table td{border-bottom:1px solid #f2f4f7;padding:.65rem .75rem}
+  .table tr:hover td{background:#fafafa}
+  /* Picker styling (reused from manager modal) */
+  .picker{border:1px solid var(--ring);border-radius:12px;padding:.6rem;background:#fff}
+  .picker .head{display:flex;align-items:center;justify-content:space-between;gap:.6rem;margin-bottom:.5rem;flex-wrap:wrap}
+  .picker input{border:1px solid var(--ring);border-radius:999px;padding:.55rem .9rem;min-width:260px;flex:1}
+  .picker .list{max-height:300px;overflow:auto;border-top:1px dashed #e8eaef;margin-top:.4rem}
+  .picker .item{display:grid;grid-template-columns:1fr 120px 110px 90px;gap:.6rem;padding:.55rem .25rem;border-bottom:1px solid #f3f4f6;cursor:pointer;transition:.15s}
+  .picker .item:hover{background:#f9fafb}
+  .picker .name{font-weight:700}
+  .picker .dim{font-size:.82rem;color:var(--muted)}
+  /* Loading spinner animation */
+  @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page">
+  <!-- Ensure CSRF cookie exists for AJAX -->
+  <form style="display:none">{% csrf_token %}</form>
+  <div class="ribbon"><div class="marquee"><span id="ribbonText">ECAGES • MAGASIN (DIRECTION GENERALE) • {{ "now"|date:"d/m/Y H:i" }}</span></div></div>
+
+  <!-- En‑tête et filtres (style gérant) -->
+  <div class="card" style="margin-bottom:12px; padding:12px 16px;">
+    <form method="get" style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+      <div style="font-weight:900; margin-right:auto;">Commandes en attente: {{ pending }}</div>
+      <div class="pills">
+        <label class="pill {% if kind == 'piece' %}active{% endif %}">
+          <input type="radio" name="type" value="piece" {% if kind == 'piece' %}checked{% endif %} /> Pièces
+        </label>
+        <label class="pill {% if kind == 'moto' %}active{% endif %}">
+          <input type="radio" name="type" value="moto" {% if kind == 'moto' %}checked{% endif %} /> Motos
+        </label>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;"> 
+        <span style="color:#64748b; font-weight:800; font-size:.85rem;">Afficher</span>
+        <select name="pp" class="btn" style="padding:.35rem .55rem;">
+          <option value="25" {% if per_page == 25 %}selected{% endif %}>25</option>
+          <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+          <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+          <option value="200" {% if per_page == 200 %}selected{% endif %}>200</option>
+        </select>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="color:#64748b; font-weight:800; font-size:.85rem;">Recherche:</span>
+        <input name="q" class="btn" placeholder="Nom, marque…" value="{{ q }}" style="min-width:260px;" />
+      </div>
+      <button class="btn">Actualiser</button>
+      <a class="btn" href="{% url 'inventory:warehouse_requests' %}">Voir les commandes</a>
+    </form>
+  </div>
+
+  <!-- Menu d'approvisionnement (section séparée) -->
+  <div class="card" style="margin-bottom:12px; padding:12px 16px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+      <div style="font-weight:900; font-size:1.05rem;">Menu d'approvisionnement</div>
+      <div style="display:flex; gap:10px;">
+        <button id="btnRestockP" type="button" class="btn btn-brand" onclick="return window.__whRestock && window.__whRestock('P')">Restock Pièces</button>
+        <button id="btnRestockM" type="button" class="btn btn-dark" onclick="return window.__whRestock && window.__whRestock('M')">Restock Motos</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tableau style gérant (optimisé pour l'entrepôt) -->
+  <div class="card" style="padding:12px 16px;">
+    <div style="color:#64748b; font-weight:800; margin-bottom:8px;">Stock de l'entrepôt</div>
+    <div style="font-size:.8rem; color:#64748b; margin-bottom:12px; padding:8px; background:#f8fafc; border-radius:6px;">
+      💡 <strong>Qté en transit</strong> = Produits envoyés mais pas encore validés par le point de vente
+    </div>
+    <div style="max-height:min(68vh, calc(100vh - 340px)); overflow:auto; width:100%">
+      <table class="table" style="width:100%; border-collapse:separate; border-spacing:0; min-width:980px;">
+        <thead>
+          <tr>
+            <th style="min-width:280px;">Produit</th>
+            <th>Marque</th>
+            <th>Prix gros</th>
+            <th>Prix vente</th>
+            <th>Qté achetée</th>
+            <th>Qté vendue</th>
+            <th>Qté dispo.</th>
+            <th>Qté en transit</th>
+            <th>Qté confirmée</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in warehouse_rows %}
+          <tr>
+            <td class="name" style="font-weight:800">{{ r.product.name }}</td>
+            <td>{{ r.product.brand.name|default:'' }}</td>
+            <td>{{ r.product.wholesale_price }}</td>
+            <td>{{ r.product.selling_price }}</td>
+            <td>{{ r.opening_qty }}</td>
+            <td>{{ r.sold_qty }}</td>
+            <td>{{ r.available_qty }}</td>
+            <td style="color:#f59e0b; font-weight:700;">{{ r.transit_qty|default:0 }}</td>
+            <td style="color:#059669; font-weight:700;">{{ r.confirmed_qty|default:0 }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="9" style="color:#64748b; padding:1rem .9rem; font-weight:700;">Aucun article.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if page %}
+    <div style="display:flex; justify-content:flex-end; gap:8px; padding:10px 0;">
+      {% if page.has_previous %}<a class="btn" href="?type={{ kind }}&q={{ q }}&pp={{ per_page }}&page={{ page.previous_page_number }}">Précédent</a>{% else %}<span class="btn" style="opacity:.5; pointer-events:none;">Précédent</span>{% endif %}
+      <div style="align-self:center; color:#64748b; font-weight:800;">Page {{ page.number }} / {{ paginator.num_pages }}</div>
+      {% if page.has_next %}<a class="btn" href="?type={{ kind }}&q={{ q }}&pp={{ per_page }}&page={{ page.next_page_number }}">Suivant</a>{% else %}<span class="btn" style="opacity:.5; pointer-events:none;">Suivant</span>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+<!-- Modal: Restock -->
+<div id="modalRestock" class="modal" style="position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.4); z-index:60; backdrop-filter:blur(2px);">
+  <div class="sheet" style="width:min(920px,95vw); max-height:90vh; background:#fff; border:1px solid var(--ring); border-radius:20px; box-shadow:0 25px 50px rgba(0,0,0,.15); overflow:hidden;">
+    <!-- Header -->
+    <div class="hd" style="display:flex; align-items:center; justify-content:space-between; padding:20px 24px; border-bottom:1px solid var(--ring); background:linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div style="width:40px; height:40px; background:var(--brand); border-radius:12px; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:900; font-size:1.2rem;">📦</div>
+        <div>
+          <div class="title" style="font-weight:900; font-size:1.1rem; color:#1f2937;">Approvisionnement depuis le MAGASIN</div>
+          <div style="font-size:.85rem; color:#64748b; margin-top:2px;">Sélectionnez le point de vente et les produits à approvisionner</div>
+        </div>
+      </div>
+      <button id="rClose" class="btn" style="padding:.5rem .7rem; border-radius:10px; font-size:.9rem;">✕ Fermer</button>
+    </div>
+
+    <!-- Body -->
+    <div class="bd" style="padding:20px 24px; overflow-y:auto; max-height:calc(90vh - 200px);">
+      <!-- Step 1: Configuration -->
+      <div class="step-section" style="margin-bottom:24px;">
+        <div class="step-header" style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+          <span style="width:24px; height:24px; background:var(--brand); color:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:.8rem;">1</span>
+          <h3 style="margin:0; font-weight:800; color:#1f2937;">Configuration de l'approvisionnement</h3>
+        </div>
+        <div class="grid" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px;">
+          <div class="field">
+            <label style="display:block; font-size:.85rem; font-weight:700; color:#374151; margin-bottom:4px;">Type de produits</label>
+            <input id="rKind" readonly class="btn" value="Pièces" style="width:100%; background:#f9fafb; color:#1f2937; font-weight:700;">
+          </div>
+          <div class="field">
+            <label style="display:block; font-size:.85rem; font-weight:700; color:#374151; margin-bottom:4px;">Référence</label>
+            <input id="rRef" readonly class="btn" value="—" style="width:100%; background:#f9fafb; color:#1f2937; font-weight:700;">
+          </div>
+          <div class="field">
+            <label style="display:block; font-size:.85rem; font-weight:700; color:#374151; margin-bottom:4px;">Point de vente destination</label>
+            <select id="rSp" class="btn" style="width:100%; font-weight:700; color:#1f2937;"></select>
+          </div>
+          <div class="field">
+            <label style="display:block; font-size:.85rem; font-weight:700; color:#374151; margin-bottom:4px;">Gérant responsable</label>
+            <input id="rMgr" readonly class="btn" value="" style="width:100%; background:#f9fafb; color:#1f2937; font-weight:700;">
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: Product Selection -->
+      <div class="step-section" style="margin-bottom:24px;">
+        <div class="step-header" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="width:24px; height:24px; background:var(--brand); color:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:.8rem;">2</span>
+            <h3 style="margin:0; font-weight:800; color:#1f2937;">Recherche et sélection des produits</h3>
+          </div>
+          <button id="openSearchModal" class="btn" style="background:var(--brand); color:#fff; padding:.5rem 1rem; font-size:.85rem; font-weight:700;">🔍 Ouvrir la recherche</button>
+        </div>
+        <div style="border:1px solid var(--ring); border-radius:12px; padding:20px; background:#f8fafc; text-align:center; color:#64748b;">
+          <div style="font-size:3rem; margin-bottom:8px;">🔍</div>
+          <div style="font-weight:700; margin-bottom:4px;">Recherche de produits</div>
+          <div style="font-size:.85rem;">Cliquez sur "Ouvrir la recherche" pour parcourir et sélectionner les produits à approvisionner</div>
+        </div>
+      </div>
+
+      <!-- Step 3: Selected Products -->
+      <div class="step-section" style="margin-bottom:0;">
+        <div class="step-header" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="width:24px; height:24px; background:var(--brand); color:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:.8rem;">3</span>
+            <h3 style="margin:0; font-weight:800; color:#1f2937;">Produits sélectionnés</h3>
+          </div>
+          <div id="rSummary" style="font-size:.85rem; color:#64748b; font-weight:700;">0 article(s)</div>
+        </div>
+        <div style="border:1px solid var(--ring); border-radius:12px; overflow:hidden; background:#fff;">
+          <table class="table" style="width:100%; margin:0;">
+            <thead style="background:#f8fafc;">
+              <tr>
+                <th style="padding:12px 16px; font-size:.8rem; color:#6b7280; font-weight:800;">Produit</th>
+                <th style="padding:12px 16px; font-size:.8rem; color:#6b7280; font-weight:800; width:120px;">Quantité</th>
+                <th style="padding:12px 16px; font-size:.8rem; color:#6b7280; font-weight:800; width:100px;">Stock dispo</th>
+                <th style="padding:12px 16px; font-size:.8rem; color:#6b7280; font-weight:800; width:80px;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="rLines">
+              <tr id="rEmptyState">
+                <td colspan="4" style="padding:30px; text-align:center; color:#9ca3af; font-style:italic;">
+                  📋 Aucun produit sélectionné<br>
+                  <span style="font-size:.8rem;">Utilisez la recherche ci-dessus pour ajouter des produits</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer Actions - Fixed at bottom -->
+    <div style="position:sticky; bottom:0; padding:20px 24px; border-top:2px solid var(--ring); background:#fff; box-shadow:0 -4px 12px rgba(0,0,0,.05);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <div style="font-size:.9rem; color:#64748b; font-weight:700;">
+          📊 Résumé: <span id="rTotalQty" style="color:#1f2937;">0</span> article(s) • Valeur: <strong id="rTotalValue" style="color:var(--brand);">0 FCFA</strong>
+        </div>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:12px;">
+        <button id="rCancel" class="btn" style="padding:.7rem 1.4rem; font-weight:700; font-size:.9rem; border:2px solid #e5e7eb;">❌ Annuler</button>
+        <button id="rSend" class="btn btn-brand" style="padding:.7rem 1.8rem; font-weight:700; font-size:.9rem; opacity:.5; box-shadow:0 4px 12px rgba(0,0,0,.15);" disabled>🚚 Approvisionner le point de vente</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Search Modal - Fullscreen -->
+<div id="searchModal" class="modal" style="position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.6); z-index:70; backdrop-filter:blur(3px);">
+  <div class="search-sheet" style="width:90vw; max-width:1100px; height:85vh; background:#fff; border-radius:16px; box-shadow:0 25px 50px rgba(0,0,0,.25); overflow:hidden; display:flex; flex-direction:column;">
+    <!-- Search Header -->
+    <div style="padding:20px 24px; border-bottom:2px solid var(--ring); background:linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); flex-shrink:0;">
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div style="width:40px; height:40px; background:var(--brand); border-radius:12px; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:900; font-size:1.2rem;">🔍</div>
+          <div>
+            <div style="font-weight:900; font-size:1.1rem; color:#1f2937;">Recherche de produits</div>
+            <div style="font-size:.85rem; color:#64748b; margin-top:2px;">Parcourez et sélectionnez les produits à approvisionner</div>
+          </div>
+        </div>
+        <button id="closeSearchModal" class="btn" style="padding:.5rem .8rem; font-weight:700;">✕ Fermer</button>
+      </div>
+      <!-- Search Input -->
+      <div style="margin-top:16px;">
+        <input id="searchInput" placeholder="Tapez le nom du produit, marque, ou référence..." style="width:100%; border:2px solid #e5e7eb; border-radius:12px; padding:14px 20px; font-size:1rem; transition:all .2s; background:#fff;" onfocus="this.style.borderColor='var(--brand)'" onblur="this.style.borderColor='#e5e7eb'">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:.8rem; color:#64748b;">
+          <span>💡 Utilisez ↑/↓ pour naviguer, Enter pour sélectionner</span>
+          <span id="searchCount" style="background:#f3f4f6; padding:2px 8px; border-radius:6px; font-weight:700;">0 résultat(s)</span>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Search Results -->
+    <div style="flex:1; overflow:hidden; display:flex; flex-direction:column;">
+      <div id="searchResults" style="flex:1; overflow:auto; padding:0;">
+        <div style="padding:60px 24px; text-align:center; color:#9ca3af; font-style:italic;">
+          <div style="font-size:4rem; margin-bottom:16px;">🔍</div>
+          <div style="font-size:1.1rem; font-weight:700; margin-bottom:8px;">Commencez votre recherche</div>
+          <div>Tapez au moins 2 caractères dans le champ ci-dessus</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Search Footer -->
+    <div style="padding:16px 24px; border-top:2px solid var(--ring); background:#fafbfc; flex-shrink:0;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div style="font-size:.9rem; color:#64748b; font-weight:700;">
+          <span id="selectedFromSearch">0</span> produit(s) sélectionné(s) dans cette session
+        </div>
+        <button id="doneSearching" class="btn btn-brand" style="padding:.6rem 1.2rem; font-weight:700;">✓ Terminer la sélection</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Custom Confirmation Modal -->
+<div id="confirmModal" class="modal" style="position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.6); z-index:80; backdrop-filter:blur(3px);">
+  <div class="sheet" style="max-width: 500px; background:#fff; border:1px solid var(--ring); border-radius:16px; box-shadow:0 25px 50px rgba(0,0,0,.25); overflow:hidden;">
+    <div class="hd" style="background: linear-gradient(135deg, #1e40af, #3b82f6); color: white; padding: 20px 24px; display: flex; align-items: center; justify-content: space-between;">
+      <span id="confirmTitle" style="font-weight: 900; font-size: 1.1rem;">Confirmation</span>
+      <button id="confirmClose" class="btn" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 8px 12px; border-radius: 8px; font-weight: 700;">✕</button>
+    </div>
+    <div class="bd" id="confirmBody" style="padding: 24px; font-size: 1rem; line-height: 1.6;">
+      <!-- Content will be inserted here -->
+    </div>
+    <div class="actions" style="padding: 16px 24px; display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid #e5e7eb;">
+      <button id="confirmCancel" class="btn" style="background: #6b7280; border-color: #6b7280; color: white; padding: 12px 20px; font-weight: 700; border-radius: 8px;">Annuler</button>
+      <button id="confirmOK" class="btn" style="background: #059669; border-color: #059669; color: white; padding: 12px 20px; font-weight: 700; border-radius: 8px;">Confirmer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Custom Success Modal -->
+<div id="successModal" class="modal" style="position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.6); z-index:80; backdrop-filter:blur(3px);">
+  <div class="sheet" style="max-width: 600px; background:#fff; border:1px solid var(--ring); border-radius:16px; box-shadow:0 25px 50px rgba(0,0,0,.25); overflow:hidden;">
+    <div class="hd" style="background: linear-gradient(135deg, #059669, #10b981); color: white; padding: 20px 24px; display: flex; align-items: center; justify-content: space-between;">
+      <span style="font-weight: 900; font-size: 1.1rem;">✅ Succès</span>
+      <button id="successClose" class="btn" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 8px 12px; border-radius: 8px; font-weight: 700;">✕</button>
+    </div>
+    <div class="bd" id="successBody" style="padding: 24px; font-size: 1rem; line-height: 1.6;">
+      <!-- Success content will be inserted here -->
+    </div>
+    <div class="actions" style="padding: 16px 24px; display: flex; justify-content: center; border-top: 1px solid #e5e7eb;">
+      <button id="successOK" class="btn" style="background: #059669; border-color: #059669; color: white; padding: 12px 24px; font-weight: 700; border-radius: 8px;">Fermer</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  // Modal helper functions
+  function showConfirmModal(title, message, onConfirm) {
+    var modal = document.getElementById('confirmModal');
+    var titleEl = document.getElementById('confirmTitle');
+    var bodyEl = document.getElementById('confirmBody');
+    var cancelBtn = document.getElementById('confirmCancel');
+    var okBtn = document.getElementById('confirmOK');
+    var closeBtn = document.getElementById('confirmClose');
+    
+    titleEl.textContent = title;
+    bodyEl.innerHTML = message;
+    
+    // Show modal
+    modal.style.display = 'flex';
+    
+    // Event handlers
+    var cleanup = function() {
+      modal.style.display = 'none';
+      cancelBtn.onclick = null;
+      okBtn.onclick = null;
+      closeBtn.onclick = null;
+    };
+    
+    cancelBtn.onclick = cleanup;
+    closeBtn.onclick = cleanup;
+    okBtn.onclick = function() {
+      cleanup();
+      if (onConfirm) onConfirm();
+    };
+  }
+  
+  function showSuccessModal(message) {
+    var modal = document.getElementById('successModal');
+    var bodyEl = document.getElementById('successBody');
+    var okBtn = document.getElementById('successOK');
+    var closeBtn = document.getElementById('successClose');
+    
+    bodyEl.innerHTML = message;
+    
+    // Show modal
+    modal.style.display = 'flex';
+    
+    // Event handlers
+    var cleanup = function() {
+      modal.style.display = 'none';
+      okBtn.onclick = null;
+      closeBtn.onclick = null;
+    };
+    
+    okBtn.onclick = cleanup;
+    closeBtn.onclick = cleanup;
+  }
+  
+  // Toast helper
+  function toast(msg, kind) {
+    var wrap = document.getElementById('toasts') || document.body;
+    var d = document.createElement('div');
+    d.className = 'toast ' + (kind === 'good' ? 'good' : kind === 'bad' ? 'bad' : '');
+    d.textContent = msg;
+    wrap.appendChild(d);
+    setTimeout(function(){ d.remove(); }, 3500);
+  }
+
+  // Marquee clock
+  var el = document.getElementById('ribbonText');
+  function pad(n) { return n < 10 ? '0' + n : n; }
+  function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+  var dateStr = cap((new Date()).toLocaleDateString('fr-FR', {weekday:'long', year:'numeric', month:'long', day:'numeric'}));
+  
+  function tick() {
+    var d = new Date();
+    var timeStr = pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+    el.textContent = 'ECAGES • MAGASIN (DIRECTION GENERALE) • ' + dateStr + ' — ' + timeStr;
+  }
+  if (el) {
+    tick();
+    setInterval(tick, 1000);
+  }
+
+  // Auto-submit on pill change
+  var radios = document.querySelectorAll('.pills input[type="radio"]');
+  for (var i = 0; i < radios.length; i++) {
+    radios[i].addEventListener('change', function() {
+      var form = this.closest('form');
+      if (form) form.submit();
+    });
+  }
+
+  // Auto-submit on search and per-page change
+  var form = document.querySelector('form[method="get"]');
+  var search = form ? form.querySelector('input[name="q"]') : null;
+  var perPage = form ? form.querySelector('select[name="pp"]') : null;
+  
+  function debounce(fn, ms) {
+    var timeout;
+    return function() {
+      var args = arguments;
+      clearTimeout(timeout);
+      timeout = setTimeout(function() { fn.apply(null, args); }, ms);
+    };
+  }
+
+  if (search) {
+    search.addEventListener('input', debounce(function() { form.submit(); }, 300));
+  }
+  if (perPage) {
+    perPage.addEventListener('change', function() { form.submit(); });
+  }
+
+  // Restock modal functionality
+  function launchRestock(kind) {
+    var modal = document.getElementById('modalRestock');
+    var rKind = document.getElementById('rKind');
+    var rRef = document.getElementById('rRef');
+    var rSp = document.getElementById('rSp');
+    var rMgr = document.getElementById('rMgr');
+    var rQ = document.getElementById('rQ');
+    var rList = document.getElementById('rList');
+    var rSend = document.getElementById('rSend');
+    var rLines = document.getElementById('rLines');
+    
+    // Get CSRF token
+    var csrfMatch = document.cookie.match('(^|;)\\s*csrftoken\\s*=\\s*([^;]+)');
+    var CSRF = csrfMatch ? csrfMatch.pop() : '';
+
+    // Set kind
+    rKind.value = kind === 'M' ? 'Motos' : 'Pièces';
+    
+    // Load reference number
+    fetch('/inventory/api/wh/ref/?kind=' + kind)
+      .then(function(resp) { return resp.json(); })
+      .then(function(data) {
+        if (data && data.ok) {
+          rRef.value = data.ref;
+        } else {
+          rRef.value = '—';
+        }
+      })
+      .catch(function() {
+        rRef.value = '—';
+      });
+
+    // Load salespoints - ensure clean slate
+    rSp.innerHTML = '';
+    // Add a default option first
+    var defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.textContent = 'Choisissez un point de vente...';
+    defaultOption.disabled = true;
+    defaultOption.selected = true;
+    rSp.appendChild(defaultOption);
+    
+    fetch('/inventory/api/wh/salespoints/')
+      .then(function(resp) { return resp.json(); })
+      .then(function(data) {
+        if (data && data.ok) {
+          // Clear any existing options (except default)
+          while (rSp.children.length > 1) {
+            rSp.removeChild(rSp.lastChild);
+          }
+          
+          for (var i = 0; i < data.rows.length; i++) {
+            var sp = data.rows[i];
+            var option = document.createElement('option');
+            option.value = sp.id;
+            option.textContent = sp.name;
+            option.dataset.manager = sp.manager || '';
+            rSp.appendChild(option);
+          }
+          
+          // Clear manager field until a salespoint is selected
+          rMgr.value = '';
+        }
+      })
+      .catch(function() {
+        toast('Impossible de charger les points de vente.', 'bad');
+      });
+
+    // Handle salespoint selection change
+    rSp.onchange = function() {
+      var opt = rSp.options[rSp.selectedIndex];
+      rMgr.value = opt ? (opt.dataset.manager || '') : '';
+    };
+
+    // Search Modal Management
+    var searchModal = document.getElementById('searchModal');
+    var searchInput = document.getElementById('searchInput');
+    var searchResults = document.getElementById('searchResults');
+    var searchCount = document.getElementById('searchCount');
+    var selectedFromSearch = document.getElementById('selectedFromSearch');
+    var selectedCount = 0;
+    
+    // Open search modal
+    document.getElementById('openSearchModal').onclick = function() {
+      searchModal.style.display = 'flex';
+      setTimeout(function() { searchInput.focus(); }, 100);
+    };
+    
+    // Close search modal
+    document.getElementById('closeSearchModal').onclick = function() {
+      searchModal.style.display = 'none';
+    };
+    
+    document.getElementById('doneSearching').onclick = function() {
+      searchModal.style.display = 'none';
+    };
+
+    // Product search functionality
+    var searchTimeout;
+    function performSearch() {
+      var q = (searchInput.value || '').trim();
+      
+      if (!q || q.length < 2) {
+        searchResults.innerHTML = '<div style="padding:60px 24px; text-align:center; color:#9ca3af; font-style:italic;"><div style="font-size:4rem; margin-bottom:16px;">🔍</div><div style="font-size:1.1rem; font-weight:700; margin-bottom:8px;">Commencez votre recherche</div><div>Tapez au moins 2 caractères dans le champ ci-dessus</div></div>';
+        searchCount.textContent = '0 résultat(s)';
+        return;
+      }
+
+      searchResults.innerHTML = '<div style="padding:60px 24px; text-align:center; color:#64748b;"><div style="display:inline-block; width:40px; height:40px; border:3px solid #e5e7eb; border-top:3px solid var(--brand); border-radius:50%; animation:spin 1s linear infinite; margin-bottom:16px;"></div><div style="font-size:1.1rem; font-weight:700;">Recherche en cours...</div></div>';
+
+      var productType = kind === 'M' ? 'moto' : 'piece';
+      fetch('/inventory/api/wh/stock/?type=' + productType + '&q=' + encodeURIComponent(q))
+        .then(function(resp) { return resp.json(); })
+        .then(function(data) {
+          if (!data || !data.ok) {
+            searchResults.innerHTML = '<div style="padding:60px 24px; text-align:center; color:#ef4444;"><div style="font-size:4rem; margin-bottom:16px;">❌</div><div style="font-size:1.1rem; font-weight:700;">Erreur de recherche</div></div>';
+            searchCount.textContent = '0 résultat(s)';
+            return;
+          }
+          
+          var products = data.rows.slice(0, 100);
+          searchCount.textContent = products.length + ' résultat(s)';
+          
+          if (products.length === 0) {
+            searchResults.innerHTML = '<div style="padding:60px 24px; text-align:center; color:#9ca3af; font-style:italic;"><div style="font-size:4rem; margin-bottom:16px;">🔍</div><div style="font-size:1.1rem; font-weight:700; margin-bottom:8px;">Aucun produit trouvé</div><div>Essayez avec d\'autres mots-clés</div></div>';
+            return;
+          }
+
+          // Create enhanced table for search results
+          var tableHtml = '<table style="width:100%; border-collapse:separate; border-spacing:0;">' +
+            '<thead>' +
+              '<tr style="background:#f8fafc; position:sticky; top:0; z-index:1;">' +
+                '<th style="padding:12px 16px; text-align:left; font-size:.85rem; font-weight:800; color:#6b7280; border-bottom:2px solid #e5e7eb;">Produit</th>' +
+                '<th style="padding:12px 16px; text-align:left; font-size:.85rem; font-weight:800; color:#6b7280; border-bottom:2px solid #e5e7eb; width:120px;">Marque</th>' +
+                '<th style="padding:12px 16px; text-align:right; font-size:.85rem; font-weight:800; color:#6b7280; border-bottom:2px solid #e5e7eb; width:100px;">Prix gros</th>' +
+                '<th style="padding:12px 16px; text-align:center; font-size:.85rem; font-weight:800; color:#6b7280; border-bottom:2px solid #e5e7eb; width:90px;">Stock</th>' +
+                '<th style="padding:12px 16px; text-align:center; font-size:.85rem; font-weight:800; color:#6b7280; border-bottom:2px solid #e5e7eb; width:140px;">Qté + Action</th>' +
+              '</tr>' +
+            '</thead>' +
+            '<tbody>';
+
+          for (var i = 0; i < products.length; i++) {
+            var p = products[i];
+            var stockColor = p.available > 10 ? '#059669' : p.available > 0 ? '#d97706' : '#dc2626';
+            var stockIcon = p.available > 10 ? '✅' : p.available > 0 ? '⚠️' : '❌';
+            var brandDisplay = p.brand ? p.brand : '<span style="color:#9ca3af; font-style:italic;">—</span>';
+            
+            tableHtml += '<tr class="search-row" data-product=\'' + JSON.stringify(p) + '\' style="cursor:pointer; transition:all .15s;"' +
+              ' onmouseenter="this.style.background=\'#f8fafc\'" onmouseleave="this.style.background=\'#fff\'">' +
+              '<td style="padding:14px 16px; border-bottom:1px solid #f3f4f6;">' +
+                '<div style="font-weight:700; color:#1f2937; font-size:1rem; margin-bottom:2px;">' + p.name + '</div>' +
+              '</td>' +
+              '<td style="padding:14px 16px; border-bottom:1px solid #f3f4f6; font-size:.9rem; color:#64748b;">' + brandDisplay + '</td>' +
+              '<td style="padding:14px 16px; border-bottom:1px solid #f3f4f6; text-align:right; font-weight:700; color:#1f2937; font-size:.95rem;">' + p.price.toLocaleString('fr-FR') + ' FCFA</td>' +
+              '<td style="padding:14px 16px; border-bottom:1px solid #f3f4f6; text-align:center;">' +
+                '<span style="color:' + stockColor + '; font-weight:700; font-size:.9rem;">' + stockIcon + ' ' + p.available + '</span>' +
+              '</td>' +
+              '<td style="padding:14px 16px; border-bottom:1px solid #f3f4f6; text-align:center;">' +
+                '<div style="display:flex; align-items:center; gap:6px; justify-content:center;">' +
+                  '<input type="number" class="qty-input" min="1" max="' + p.available + '" value="1" style="width:50px; border:1px solid #d1d5db; border-radius:4px; padding:4px 6px; text-align:center; font-weight:700; font-size:.85rem;">' +
+                  '<button class="quick-add-btn" style="background:var(--brand); color:#fff; border:none; border-radius:6px; padding:6px 10px; font-size:.8rem; font-weight:700; cursor:pointer; transition:all .2s;">+ Ajouter</button>' +
+                '</div>' +
+              '</td>' +
+            '</tr>';
+          }
+          
+          tableHtml += '</tbody></table>';
+          searchResults.innerHTML = tableHtml;
+          
+          // Add click handlers for all rows and buttons
+          var searchRows = searchResults.querySelectorAll('.search-row');
+          for (var i = 0; i < searchRows.length; i++) {
+            (function(row) {
+              var productData = JSON.parse(row.dataset.product);
+              
+              // Row click (anywhere except button and input)
+              row.addEventListener('click', function(e) {
+                if (e.target.className === 'quick-add-btn' || e.target.className === 'qty-input') return;
+                var qtyInput = row.querySelector('.qty-input');
+                var qty = parseInt(qtyInput.value || '1', 10);
+                addLineFromSearchWithQty(productData, qty);
+              });
+              
+              // Quantity input event handling
+              var qtyInput = row.querySelector('.qty-input');
+              if (qtyInput) {
+                qtyInput.addEventListener('click', function(e) {
+                  e.stopPropagation();
+                });
+                
+                qtyInput.addEventListener('keydown', function(e) {
+                  e.stopPropagation();
+                  if (e.key === 'Enter') {
+                    var qty = parseInt(this.value || '1', 10);
+                    addLineFromSearchWithQty(productData, qty);
+                  }
+                });
+                
+                // Auto-select text when focused
+                qtyInput.addEventListener('focus', function() {
+                  this.select();
+                });
+              }
+              
+              // Button click
+              var btn = row.querySelector('.quick-add-btn');
+              if (btn) {
+                btn.addEventListener('click', function(e) {
+                  e.stopPropagation();
+                  var qty = parseInt(qtyInput.value || '1', 10);
+                  addLineFromSearchWithQty(productData, qty);
+                });
+                
+                // Button hover effect
+                btn.onmouseenter = function() { this.style.background = '#7c2d12'; this.style.transform = 'scale(1.05)'; };
+                btn.onmouseleave = function() { this.style.background = 'var(--brand)'; this.style.transform = 'scale(1)'; };
+              }
+            })(searchRows[i]);
+          }
+        })
+        .catch(function() {
+          searchResults.innerHTML = '<div style="padding:60px 24px; text-align:center; color:#ef4444;"><div style="font-size:4rem; margin-bottom:16px;">❌</div><div style="font-size:1.1rem; font-weight:700;">Erreur réseau</div></div>';
+          searchCount.textContent = '0 résultat(s)';
+        });
+    }
+
+    searchInput.oninput = function() {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(performSearch, 300);
+    };
+    
+    // Add keyboard navigation for search modal
+    searchInput.onkeydown = function(e) {
+      var rows = searchResults.querySelectorAll('.search-row');
+      if (rows.length === 0) return;
+      
+      var current = searchResults.querySelector('.search-row.highlighted');
+      var currentIndex = current ? Array.from(rows).indexOf(current) : -1;
+      
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (current) { current.classList.remove('highlighted'); current.style.background = '#fff'; }
+        var nextIndex = currentIndex < rows.length - 1 ? currentIndex + 1 : 0;
+        rows[nextIndex].classList.add('highlighted');
+        rows[nextIndex].style.background = '#e0f2fe';
+        rows[nextIndex].scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (current) { current.classList.remove('highlighted'); current.style.background = '#fff'; }
+        var prevIndex = currentIndex > 0 ? currentIndex - 1 : rows.length - 1;
+        rows[prevIndex].classList.add('highlighted');
+        rows[prevIndex].style.background = '#e0f2fe';
+        rows[prevIndex].scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'Enter' && current) {
+        e.preventDefault();
+        var productData = JSON.parse(current.dataset.product);
+        var qtyInput = current.querySelector('.qty-input');
+        var qty = parseInt(qtyInput.value || '1', 10);
+        addLineFromSearchWithQty(productData, qty);
+      }
+    };
+    
+    // Add product from search modal with quantity
+    function addLineFromSearchWithQty(p, qty) {
+      // Validate quantity
+      if (!qty || qty < 1) {
+        toast('⚠️ Quantité invalide', 'bad');
+        return;
+      }
+      if (qty > p.available) {
+        toast('⚠️ Quantité supérieure au stock disponible (' + p.available + ')', 'bad');
+        return;
+      }
+      
+      // Check if product already exists
+      var existingRow = rLines.querySelector("tr[data-pid='" + p.product_id + "']");
+      if (existingRow) {
+        // Update existing quantity
+        var existingInput = existingRow.querySelector('input[type="number"]');
+        var currentQty = parseInt(existingInput.value || '0', 10);
+        var newQty = currentQty + qty;
+        
+        if (newQty > p.available) {
+          toast('⚠️ Quantité totale supérieure au stock disponible (' + p.available + ')', 'bad');
+          return;
+        }
+        
+        existingInput.value = newQty;
+        updateSummary();
+        toast('✓ ' + p.name + ' - Quantité mise à jour: ' + newQty, 'good');
+      } else {
+        // Add new product with specified quantity
+        addLineWithQty(p, qty);
+        toast('✓ ' + p.name + ' ajouté (' + qty + ')', 'good');
+      }
+      
+      selectedCount++;
+      selectedFromSearch.textContent = selectedCount;
+    }
+    
+    // Add product line with specific quantity
+    function addLineWithQty(p, qty) {
+      var tr = document.createElement('tr');
+      tr.dataset.pid = String(p.product_id);
+      tr.dataset.price = String(p.price || 0);
+      
+      var brandText = p.brand ? (' <span style="color:#64748b; font-size:.85rem;">— ' + p.brand + '</span>') : "";
+      var stockColor = p.available > 10 ? '#059669' : p.available > 0 ? '#d97706' : '#dc2626';
+      
+      tr.innerHTML = 
+        '<td style="padding:12px 16px;"><strong style="color:#1f2937;">' + p.name + '</strong>' + brandText + '</td>' +
+        '<td style="padding:12px 16px;"><input type="number" min="1" max="' + (p.available || 9999) + '" value="' + qty + '" style="width:80px; border:1px solid #d1d5db; border-radius:6px; padding:6px 8px; text-align:center; font-weight:700;"></td>' +
+        '<td style="padding:12px 16px; color:' + stockColor + '; font-weight:700;">' + p.available + '</td>' +
+        '<td style="padding:12px 16px;"><button class="btn" style="background:#fca5a5; color:#991b1b; border:none; padding:4px 8px; border-radius:6px; font-size:.8rem;">🗑️ Suppr.</button></td>';
+      
+      // Add quantity change listener
+      var qtyInput = tr.querySelector('input[type="number"]');
+      qtyInput.addEventListener('input', updateSummary);
+      
+      // Add remove button listener
+      tr.querySelector('button').addEventListener('click', function() {
+        tr.remove();
+        updateSummary();
+      });
+      
+      rLines.appendChild(tr);
+      updateSummary();
+    }
+    
+    // Legacy function for compatibility
+    function addLineFromSearch(p) {
+      addLineFromSearchWithQty(p, 1);
+    }
+
+    // Summary and totals update
+    function updateSummary() {
+      var rows = rLines.querySelectorAll('tr:not(#rEmptyState)');
+      var totalQty = 0;
+      var totalValue = 0;
+      
+      for (var i = 0; i < rows.length; i++) {
+        var tr = rows[i];
+        var qtyInput = tr.querySelector('input[type="number"]');
+        var qty = parseInt(qtyInput.value || '0', 10);
+        var price = parseFloat(tr.dataset.price || '0');
+        totalQty += qty;
+        totalValue += qty * price;
+      }
+      
+      document.getElementById('rSummary').textContent = totalQty + ' article(s)';
+      document.getElementById('rTotalQty').textContent = totalQty;
+      document.getElementById('rTotalValue').textContent = totalValue.toLocaleString('fr-FR');
+      
+      var sendBtn = document.getElementById('rSend');
+      var emptyState = document.getElementById('rEmptyState');
+      
+      if (rows.length > 0) {
+        sendBtn.disabled = false;
+        sendBtn.style.opacity = '1';
+        emptyState.style.display = 'none';
+      } else {
+        sendBtn.disabled = true;
+        sendBtn.style.opacity = '.5';
+        emptyState.style.display = '';
+      }
+    }
+
+    // Add product line function
+    function addLine(p) {
+      var existingRow = rLines.querySelector("tr[data-pid='" + p.product_id + "']");
+      if (existingRow) {
+        toast('Produit déjà ajouté', 'info');
+        return;
+      }
+      
+      var tr = document.createElement('tr');
+      tr.dataset.pid = String(p.product_id);
+      tr.dataset.price = String(p.price || 0);
+      
+      var brandText = p.brand ? (' <span style="color:#64748b; font-size:.85rem;">— ' + p.brand + '</span>') : "";
+      var stockColor = p.available > 10 ? '#059669' : p.available > 0 ? '#d97706' : '#dc2626';
+      
+      tr.innerHTML = 
+        '<td style="padding:12px 16px;"><strong style="color:#1f2937;">' + p.name + '</strong>' + brandText + '</td>' +
+        '<td style="padding:12px 16px;"><input type="number" min="1" max="' + (p.available || 9999) + '" value="1" style="width:80px; border:1px solid #d1d5db; border-radius:6px; padding:6px 8px; text-align:center; font-weight:700;"></td>' +
+        '<td style="padding:12px 16px; color:' + stockColor + '; font-weight:700;">' + p.available + '</td>' +
+        '<td style="padding:12px 16px;"><button class="btn" style="background:#fca5a5; color:#991b1b; border:none; padding:4px 8px; border-radius:6px; font-size:.8rem;">🗑️ Suppr.</button></td>';
+      
+      // Add quantity change listener
+      var qtyInput = tr.querySelector('input[type="number"]');
+      qtyInput.addEventListener('input', updateSummary);
+      
+      // Add remove button listener
+      tr.querySelector('button').addEventListener('click', function() {
+        tr.remove();
+        updateSummary();
+      });
+      
+      rLines.appendChild(tr);
+      updateSummary();
+      
+      // Clear search
+      rList.innerHTML = '<div style="padding:20px; text-align:center; color:#9ca3af; font-style:italic;">Aucune recherche en cours...</div>';
+      rQ.value = '';
+      
+      toast('Produit ajouté: ' + p.name, 'good');
+    }
+
+    // Send restock request with confirmation
+    rSend.onclick = function() {
+      var to_sp = parseInt(rSp.value || '0', 10);
+      if (!to_sp) {
+        toast('Choisissez un point de vente.', 'bad');
+        return;
+      }
+
+      var lines = [];
+      var rows = rLines.querySelectorAll('tr:not(#rEmptyState)');
+      for (var i = 0; i < rows.length; i++) {
+        var tr = rows[i];
+        var pid = parseInt(tr.dataset.pid || '0', 10);
+        var inp = tr.querySelector('input');
+        var q = parseInt((inp && inp.value) || '0', 10);
+        if (pid && q > 0) {
+          lines.push({product_id: pid, qty: q});
+        }
+      }
+
+      if (!lines.length) {
+        toast('Ajoutez au moins un article.', 'bad');
+        return;
+      }
+
+      // Show custom confirmation modal
+      var salespointName = rSp.options[rSp.selectedIndex].textContent;
+      var totalItems = lines.length;
+      var totalQty = lines.reduce(function(sum, line) { return sum + line.qty; }, 0);
+      
+      // Show custom confirmation modal
+      showConfirmModal(
+        'Confirmer l\'approvisionnement vers ' + salespointName + '?',
+        totalItems + ' produit(s)<br>' + 
+        totalQty + ' articles au total<br><br>' +
+        '<em>Cette action enverra la demande au gérant pour validation.</em>',
+        function() {
+          // User confirmed - proceed with restock
+          proceedWithRestock();
+        }
+      );
+      
+      return; // Stop here, wait for confirmation
+    }
+    
+    // Function to proceed with restock after confirmation
+    function proceedWithRestock() {
+      // Get the salespoint ID from the select element
+      var to_sp = parseInt(rSp.value || '0', 10);
+      if (!to_sp) {
+        toast('Choisissez un point de vente.', 'bad');
+        return;
+      }
+      
+      // Get the lines from the table
+      var lines = [];
+      var rows = rLines.querySelectorAll('tr:not(#rEmptyState)');
+      for (var i = 0; i < rows.length; i++) {
+        var tr = rows[i];
+        var pid = parseInt(tr.dataset.pid || '0', 10);
+        var inp = tr.querySelector('input');
+        var q = parseInt((inp && inp.value) || '0', 10);
+        if (pid && q > 0) {
+          lines.push({product_id: pid, qty: q});
+        }
+      }
+      
+      if (!lines.length) {
+        toast('Ajoutez au moins un article.', 'bad');
+        return;
+      }
+      
+      // Get salespoint name and calculate totals for success message
+      var salespointName = rSp.options[rSp.selectedIndex].textContent;
+      var totalItems = lines.length;
+      var totalQty = lines.reduce(function(sum, line) { return sum + line.qty; }, 0);
+      
+      // Show loader
+      rSend.disabled = true;
+      rSend.innerHTML = '⏳ Envoi en cours...';
+      rSend.style.opacity = '0.7';
+
+      var payload = {
+        to_sp: to_sp,
+        kind: kind.toUpperCase(),
+        lines: lines
+      };
+
+      fetch('/inventory/api/wh/restock/send/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': CSRF
+        },
+        body: JSON.stringify(payload)
+      })
+      .then(function(resp) { return resp.json(); })
+      .then(function(data) {
+        if (data && data.ok) {
+          // Show success message
+          rSend.innerHTML = '✅ Envoyé avec succès';
+          rSend.style.background = '#059669';
+          
+          toast('✅ Approvisionnement envoyé: ' + data.reference, 'good');
+          
+          // Show custom success modal
+          setTimeout(function() {
+            showSuccessModal(
+              '<div style="text-align: center; margin-bottom: 20px;">' +
+              '<div style="font-size: 3rem; margin-bottom: 16px;">🎉</div>' +
+              '<h3 style="color: #059669; margin-bottom: 16px;">Approvisionnement envoyé avec succès!</h3>' +
+              '</div>' +
+              '<div style="background: #f8fafc; padding: 16px; border-radius: 8px; margin-bottom: 16px;">' +
+              '<div><strong>Référence:</strong> ' + data.reference + '</div>' +
+              '<div><strong>Destination:</strong> ' + salespointName + '</div>' +
+              '<div><strong>Articles:</strong> ' + totalItems + ' produit(s), ' + totalQty + ' articles</div>' +
+              '</div>' +
+              '<div style="color: #64748b; font-size: 0.9rem; text-align: center;">' +
+              'Le gérant du point de vente recevra une notification et devra valider chaque produit reçu physiquement.' +
+              '</div>'
+            );
+            
+            modal.style.display = 'none';
+            setTimeout(function() { location.reload(); }, 2000);
+          }, 1000);
+        } else {
+          // Reset button on error
+          rSend.disabled = false;
+          rSend.innerHTML = '🚚 Approvisionner le point de vente';
+          rSend.style.opacity = '1';
+          rSend.style.background = 'var(--brand)';
+          toast(data.error || "Échec de l'envoi.", 'bad');
+        }
+      })
+      .catch(function() {
+        // Reset button on error
+        rSend.disabled = false;
+        rSend.innerHTML = '🚚 Approvisionner le point de vente';
+        rSend.style.opacity = '1';
+        rSend.style.background = 'var(--brand)';
+        toast('Erreur réseau.', 'bad');
+      });
+    };
+
+    // Close modal handlers
+    document.getElementById('rClose').onclick = function() {
+      modal.style.display = 'none';
+    };
+    
+    document.getElementById('rCancel').onclick = function() {
+      modal.style.display = 'none';
+    };
+    
+    // Initialize summary
+    updateSummary();
+
+    // Show modal
+    modal.style.display = 'flex';
+  }
+
+  // Global restock function
+  window.__whRestock = function(kind) {
+    launchRestock(kind || 'P');
+    return false;
+  };
+
+  // Direct button handlers as backup
+  var btnRestockP = document.getElementById('btnRestockP');
+  var btnRestockM = document.getElementById('btnRestockM');
+  
+  if (btnRestockP) {
+    btnRestockP.addEventListener('click', function() {
+      launchRestock('P');
+    });
+  }
+  
+  if (btnRestockM) {
+    btnRestockM.addEventListener('click', function() {
+      launchRestock('M');
+    });
+  }
+});
+</script>
+{% endblock %}
+
+

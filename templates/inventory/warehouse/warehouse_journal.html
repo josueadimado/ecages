@@ -1,0 +1,348 @@
+{% extends "layouts/base_sales.html" %}
+{% block title %}Journal de l'entrepôt | ECAGES{% endblock %}
+{% block content %}
+<div class="page">
+  <div class="ribbon"><div class="marquee"><span id="ribbonText">ECAGES • MAGASIN (DIRECTION GENERALE) • {{ "now"|date:"d/m/Y H:i" }}</span></div></div>
+  
+  <!-- Header -->
+  <div class="mb-8">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-3xl font-bold text-gray-900">Journal de l'entrepôt</h1>
+        <p class="text-gray-600 mt-1">Gestion des demandes de réapprovisionnement</p>
+      </div>
+      <div class="text-sm text-gray-500">
+        {{ "now"|date:"d/m/Y H:i" }}
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+    <form method="get" class="space-y-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Période</label>
+          <select name="date" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand focus:border-transparent">
+            <option value="today" {% if date_filter == 'today' %}selected{% endif %}>Aujourd'hui</option>
+            <option value="yesterday" {% if date_filter == 'yesterday' %}selected{% endif %}>Hier</option>
+            <option value="week" {% if date_filter == 'week' %}selected{% endif %}>Cette semaine</option>
+            <option value="custom" {% if date_filter == 'custom' %}selected{% endif %}>Période personnalisée</option>
+          </select>
+        </div>
+        
+        <div id="custom-date-range" style="{% if date_filter != 'custom' %}display: none;{% endif %}">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Du</label>
+          <input type="date" name="start_date" value="{{ start_date }}" 
+                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand focus:border-transparent" />
+        </div>
+        
+        <div id="custom-date-range-end" style="{% if date_filter != 'custom' %}display: none;{% endif %}">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Au</label>
+          <input type="date" name="end_date" value="{{ end_date }}" 
+                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand focus:border-transparent" />
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Statut</label>
+          <select name="status" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand focus:border-transparent">
+            <option value="">Tous les statuts</option>
+            <option value="sent" {% if status_filter == 'sent' %}selected{% endif %}>En attente</option>
+            <option value="partially_validated" {% if status_filter == 'partially_validated' %}selected{% endif %}>Partiellement validé</option>
+            <option value="validated" {% if status_filter == 'validated' %}selected{% endif %}>Validé</option>
+            <option value="approved" {% if status_filter == 'approved' %}selected{% endif %}>Approuvé</option>
+            <option value="rejected" {% if status_filter == 'rejected' %}selected{% endif %}>Rejeté</option>
+            <option value="fulfilled" {% if status_filter == 'fulfilled' %}selected{% endif %}>Servi</option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Rechercher</label>
+          <input name="q" placeholder="Référence, point de vente, produit..." value="{{ q }}" 
+                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand focus:border-transparent" />
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Point de vente</label>
+          <select name="sp" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand focus:border-transparent">
+            <option value="">Tous les points de vente</option>
+            {% for sp in salespoints %}
+            <option value="{{ sp.id }}" {% if sp_id == sp.id %}selected{% endif %}>{{ sp.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      
+      <div class="flex gap-3">
+        <button type="submit" class="px-4 py-2 bg-brand text-white rounded-md hover:bg-opacity-90 focus:ring-2 focus:ring-brand focus:ring-offset-2">
+          Filtrer
+        </button>
+        <a href="{% url 'inventory:warehouse_journal' %}" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
+          Effacer
+        </a>
+      </div>
+    </form>
+    
+    <script>
+      document.querySelector('select[name="date"]').addEventListener('change', function() {
+        const customRange = document.getElementById('custom-date-range');
+        const customRangeEnd = document.getElementById('custom-date-range-end');
+        if (this.value === 'custom') {
+          customRange.style.display = 'block';
+          customRangeEnd.style.display = 'block';
+        } else {
+          customRange.style.display = 'none';
+          customRangeEnd.style.display = 'none';
+        }
+      });
+    </script>
+  </div>
+
+  <!-- Summary Stats -->
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div class="flex items-center">
+        <div class="flex-shrink-0">
+          <div class="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
+            <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="ml-4">
+          <p class="text-sm font-medium text-gray-500">Total réapprovisionnements</p>
+          <p class="text-2xl font-semibold text-gray-900">{{ total_requests|default:rows|length }}</p>
+        </div>
+      </div>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div class="flex items-center">
+        <div class="flex-shrink-0">
+          <div class="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
+            <svg class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="ml-4">
+          <p class="text-sm font-medium text-gray-500">En attente</p>
+          <p class="text-2xl font-semibold text-gray-900">{{ pending_requests|default:0 }}</p>
+        </div>
+      </div>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div class="flex items-center">
+        <div class="flex-shrink-0">
+          <div class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+            <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="ml-4">
+          <p class="text-sm font-medium text-gray-500">Validées</p>
+          <p class="text-2xl font-semibold text-gray-900">{{ validated_requests|default:0 }}</p>
+        </div>
+      </div>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div class="flex items-center">
+        <div class="flex-shrink-0">
+          <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="ml-4">
+          <p class="text-sm font-medium text-gray-500">Valeur totale</p>
+          <p class="text-2xl font-semibold text-gray-900">{{ total_value|floatformat:0|default:0 }} FCFA</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Requests List -->
+  <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-x-auto">
+    {% if rows %}
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-50">
+        <tr class="text-xs font-semibold uppercase text-gray-600">
+          <th class="px-6 py-3 text-left">Réf</th>
+          <th class="px-6 py-3 text-left">Point de vente</th>
+          <th class="px-6 py-3 text-left">Envoyé par</th>
+          <th class="px-6 py-3 text-left">Date</th>
+          <th class="px-6 py-3 text-left">Produits</th>
+          <th class="px-6 py-3 text-left">Qté</th>
+          <th class="px-6 py-3 text-left">Valeur</th>
+          <th class="px-6 py-3 text-left">Statut</th>
+          <th class="px-6 py-3 text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {% for req in rows %}
+        <tr class="hover:bg-gray-50">
+          <td class="px-6 py-3 text-sm font-medium text-gray-900">{% if req.reference %}{{ req.reference }}{% else %}#{{ req.id }}{% endif %}</td>
+          <td class="px-6 py-3 text-sm text-gray-700">{{ req.salespoint.name }}</td>
+          <td class="px-6 py-3 text-sm text-gray-700">{{ req.requested_by.get_full_name|default:req.requested_by.username }}</td>
+          <td class="px-6 py-3 text-sm text-gray-700">{{ req.created_at|date:"d/m/Y H:i" }}</td>
+          <td class="px-6 py-3 text-sm text-gray-700">{{ req.total_products }}</td>
+          <td class="px-6 py-3 text-sm text-gray-700">{{ req.calculated_total_quantity }}{% if req.validated_quantity != req.calculated_total_quantity %} <span class="text-gray-500">({{ req.validated_quantity }} validé{{ req.validated_quantity|pluralize }})</span>{% endif %}</td>
+          <td class="px-6 py-3 text-sm text-gray-700">{{ req.total_value|floatformat:0 }} FCFA{% if req.validated_value != req.total_value %} <span class="text-gray-500">({{ req.validated_value|floatformat:0 }} validés)</span>{% endif %}</td>
+          <td class="px-6 py-3 text-sm">
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+              {% if req.status == 'sent' %}bg-yellow-100 text-yellow-800
+              {% elif req.status == 'validated' %}bg-green-100 text-green-800
+              {% elif req.status == 'partially_validated' %}bg-blue-100 text-blue-800
+              {% elif req.status == 'approved' %}bg-purple-100 text-purple-800
+              {% elif req.status == 'rejected' %}bg-red-100 text-red-800
+              {% elif req.status == 'fulfilled' %}bg-gray-100 text-gray-800
+              {% elif req.status == 'cancelled' %}bg-gray-100 text-gray-800
+              {% else %}bg-gray-100 text-gray-800{% endif %}">{{ req.get_status_display }}</span>
+          </td>
+          <td class="px-6 py-3 text-sm text-right whitespace-nowrap">
+            <button onclick="showRequestDetails({{ req.id }})" class="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand">Voir</button>
+            <a href="{% url 'inventory:warehouse_request_print' req.id %}" target="_blank" rel="noopener" class="inline-flex items-center px-3 py-1.5 ml-2 border border-gray-300 shadow-sm text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand">Imprimer</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <div class="px-6 py-12 text-center text-gray-600">Aucune demande trouvée</div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Modal for showing request details -->
+<div id="requestModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+  <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
+    <div class="mt-3">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between pb-4 border-b">
+        <h3 class="text-lg font-medium text-gray-900" id="modalTitle">Détail de l'approvisionnement</h3>
+        <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      
+      <!-- Modal Content -->
+      <div class="mt-4">
+        <div id="modalContent" class="space-y-4">
+          <!-- Content will be loaded here -->
+        </div>
+      </div>
+      
+      <!-- Modal Footer -->
+      <div class="flex justify-end space-x-3 mt-6 pt-4 border-t">
+        <button onclick="closeModal()" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400">
+          Fermer
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showRequestDetails(requestId) {
+  // Show loading state
+  document.getElementById('modalContent').innerHTML = `
+    <div class="flex items-center justify-center py-8">
+      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+      <span class="ml-2 text-gray-600">Chargement...</span>
+    </div>
+  `;
+  
+  // Show modal
+  document.getElementById('requestModal').classList.remove('hidden');
+  
+  // Fetch request details
+  fetch(`/inventory/warehouse/requests/${requestId}/lines/`)
+    .then(response => response.json())
+    .then(data => {
+      if (data.ok) {
+        displayRequestDetails(data);
+      } else {
+        document.getElementById('modalContent').innerHTML = `
+          <div class="text-red-600 text-center py-4">
+            Erreur: ${data.error || 'Impossible de charger les détails'}
+          </div>
+        `;
+      }
+    })
+    .catch(error => {
+      document.getElementById('modalContent').innerHTML = `
+        <div class="text-red-600 text-center py-4">
+          Erreur de connexion: ${error.message}
+        </div>
+      `
+    });
+}
+
+function displayRequestDetails(data){
+  const content = `
+    <div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div>
+          <div><span class="font-medium text-gray-700">Référence:</span><span class="ml-2">${data.reference}</span></div>
+          <div><span class="font-medium text-gray-700">Point de vente:</span><span class="ml-2">${data.salespoint}</span></div>
+        </div>
+        <div>
+          <div><span class="font-medium text-gray-700">Envoyé par:</span><span class="ml-2">${data.sent_by}</span></div>
+          <div><span class="font-medium text-gray-700">Date:</span><span class="ml-2">${data.created_at}</span></div>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Produit</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Marque</th>
+              <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qté envoyée</th>
+              <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Statut</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            ${data.lines.map(line => `
+              <tr>
+                <td class="px-4 py-2 text-sm text-gray-900">${line.name}</td>
+                <td class="px-4 py-2 text-sm text-gray-500">${line.brand || '-'}</td>
+                <td class="px-4 py-2 text-sm text-gray-900 text-right">${line.qty_sent}</td>
+                <td class="px-4 py-2 text-sm text-center">
+                  ${line.is_validated 
+                    ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                         ✓ Validé
+                         ${line.validated_at ? `<br><span class="text-xs text-gray-500">${line.validated_at}</span>` : ''}
+                       </span>`
+                    : `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                         ⏳ En attente
+                       </span>`
+                  }
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+  document.getElementById('modalContent').innerHTML = content;
+}
+
+function closeModal() {
+  document.getElementById('requestModal').classList.add('hidden');
+}
+
+document.getElementById('requestModal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+</script>
+
+{% endblock %}

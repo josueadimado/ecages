@@ -1,0 +1,346 @@
+{% extends "layouts/base_sales.html" %}
+{% block title %}Gestion des stocks | ECAGES{% endblock %}
+{% block extra_css %}
+<style>
+  .card{background:#fff;border:1px solid var(--ring);border-radius:14px;box-shadow:0 10px 30px rgba(2,8,23,.06)}
+  .btn{border:1px solid var(--ring);border-radius:12px;background:#fff;padding:.45rem .8rem;font-weight:800}
+  .btn:hover{box-shadow:0 6px 16px rgba(0,0,0,.08)}
+  .btn-brand{background:var(--brand);color:#fff;border-color:transparent}
+  .btn-dark{background:#111827;color:#fff;border-color:transparent}
+  .btn-success{background:#059669;color:#fff;border-color:transparent}
+  .btn-warning{background:#d97706;color:#fff;border-color:transparent}
+  .btn-danger{background:#dc2626;color:#fff;border-color:transparent}
+  .pills{display:flex;gap:.5rem;background:#fff;border:1px solid var(--ring);border-radius:999px;padding:.25rem}
+  .pill{padding:.42rem .9rem;border-radius:999px;font-weight:700;color:#111827;display:flex;align-items:center;gap:.35rem}
+  .pill input{display:none}
+  .pill.active{background:var(--brand);color:#fff}
+  .table{width:100%;border-collapse:separate;border-spacing:0;font-size:.94rem}
+  .table th{position:sticky;top:0;background:#fff;z-index:1;text-align:left;font-size:.78rem;color:var(--muted);border-bottom:1px solid var(--ring);padding:.6rem .75rem}
+  .table td{border-bottom:1px solid #f2f4f7;padding:.65rem .75rem}
+  .table tr:hover td{background:#fafafa}
+  .badge{padding:.25rem .5rem;border-radius:6px;font-size:.75rem;font-weight:700}
+  .badge-success{background:#d1fae5;color:#065f46}
+  .badge-warning{background:#fef3c7;color:#92400e}
+  .badge-danger{background:#fee2e2;color:#991b1b}
+  .badge-info{background:#dbeafe;color:#1e40af}
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:1rem}
+  .stat-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:1rem;text-align:center}
+  .stat-number{font-size:1.5rem;font-weight:900;color:var(--brand)}
+  .stat-label{font-size:.875rem;color:var(--muted);margin-top:.25rem}
+  .view-tabs{display:flex;gap:.5rem;margin-bottom:1rem}
+  .view-tab{padding:.5rem 1rem;border:1px solid var(--ring);border-radius:8px;background:#fff;cursor:pointer;font-weight:700}
+  .view-tab.active{background:var(--brand);color:#fff;border-color:var(--brand)}
+  .stock-alert{color:#dc2626;font-weight:700}
+  .stock-low{color:#d97706;font-weight:700}
+  .stock-ok{color:#059669;font-weight:700}
+  .stock-zero{color:#6b7280;font-weight:700}
+  .no-stock{color:#94a3b8;font-style:italic}
+  .has-stock{font-weight:800}
+  .stock-status{display:inline-block;padding:2px 6px;border-radius:4px;font-size:0.75rem;font-weight:700;text-transform:uppercase}
+  .status-in-stock{background:#d1fae5;color:#065f46}
+  .status-no-stock{background:#f3f4f6;color:#6b7280}
+  .status-low-stock{background:#fef3c7;color:#92400e}
+  .pagination{display:flex;justify-content:center;align-items:center;gap:8px;margin:20px 0;padding:16px}
+  .pagination a,.pagination span{padding:8px 12px;border:1px solid var(--ring);border-radius:6px;text-decoration:none;color:#111827;font-weight:700;min-width:40px;text-align:center}
+  .pagination a:hover{background:#f8fafc;border-color:var(--brand)}
+  .pagination .current{background:var(--brand);color:#fff;border-color:var(--brand)}
+  .pagination .disabled{color:#94a3b8;cursor:not-allowed;background:#f8fafc}
+  .pagination .disabled:hover{background:#f8fafc}
+</style>
+{% endblock %}
+{% block content %}
+<div class="page">
+  <div class="ribbon"><div class="marquee"><span id="ribbonText">ECAGES • MAGASIN (DIRECTION GENERALE) • {{ "now"|date:"d/m/Y H:i" }}</span></div></div>
+
+  <!-- Header and filters -->
+  <div class="card" style="margin-bottom:12px; padding:12px 16px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+      <h1 style="margin:0; font-size:1.25rem; font-weight:900;">Gestion des stocks</h1>
+      <div style="display:flex; gap:8px;">
+        <a href="{% url 'inventory:warehouse_dashboard' %}" class="btn">← Retour au tableau de bord</a>
+      </div>
+    </div>
+    
+    <form method="get" style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+      <!-- View type tabs -->
+      <div class="view-tabs">
+        <label class="view-tab {% if view_type == 'warehouse' %}active{% endif %}">
+          <input type="radio" name="view" value="warehouse" {% if view_type == 'warehouse' %}checked{% endif %} />
+          Entrepôt
+        </label>
+        <label class="view-tab {% if view_type == 'salespoint' %}active{% endif %}">
+          <input type="radio" name="view" value="salespoint" {% if view_type == 'salespoint' %}checked{% endif %} />
+          Point de vente
+        </label>
+      </div>
+      
+      <!-- Product type filter -->
+      <div class="pills">
+        <label class="pill {% if product_type == 'piece' %}active{% endif %}">
+          <input type="radio" name="type" value="piece" {% if product_type == 'piece' %}checked{% endif %} /> Pièces
+        </label>
+        <label class="pill {% if product_type == 'moto' %}active{% endif %}">
+          <input type="radio" name="type" value="moto" {% if product_type == 'moto' %}checked{% endif %} /> Motos
+        </label>
+      </div>
+      
+      <!-- Salespoint filter (only show when salespoint view is selected) -->
+      {% if view_type == 'salespoint' %}
+      <select name="sp" class="btn" required>
+        <option value="">Sélectionner un point de vente</option>
+        {% for s in salespoints %}
+        {% if not s.is_warehouse %}
+        <option value="{{ s.id }}" {% if sp_id == s.id %}selected{% endif %}>{{ s.name }}</option>
+        {% endif %}
+        {% endfor %}
+      </select>
+      {% endif %}
+      
+      <!-- Search -->
+      <input name="q" placeholder="Rechercher un produit..." value="{{ q }}" class="btn" style="min-width:200px;" />
+      
+      <!-- Stock status filter -->
+      <select name="stock" class="btn" onchange="this.form.submit()">
+        <option value="all" {% if stock_filter == 'all' %}selected{% endif %}>Tous</option>
+        <option value="low" {% if stock_filter == 'low' %}selected{% endif %}>Stock bas</option>
+        <option value="zero" {% if stock_filter == 'zero' %}selected{% endif %}>Épuisé</option>
+        <option value="ok" {% if stock_filter == 'ok' %}selected{% endif %}>OK</option>
+      </select>
+
+      <!-- Page size selector -->
+      <select name="per_page" class="btn" onchange="this.form.submit()">
+        <option value="25" {% if request.GET.per_page == '25' %}selected{% endif %}>25 par page</option>
+        <option value="50" {% if request.GET.per_page == '50' or not request.GET.per_page %}selected{% endif %}>50 par page</option>
+        <option value="100" {% if request.GET.per_page == '100' %}selected{% endif %}>100 par page</option>
+        <option value="200" {% if request.GET.per_page == '200' %}selected{% endif %}>200 par page</option>
+      </select>
+      
+      <button class="btn btn-brand">Afficher</button>
+      
+      <!-- Export button -->
+      <a href="{% url 'inventory:export_finished_products' %}?view={{ view_type }}&type={{ product_type }}{% if sp_id %}&sp={{ sp_id }}{% endif %}{% if q %}&q={{ q }}{% endif %}" 
+         class="btn btn-success" 
+         style="margin-left: 8px;">
+        📊 Exporter Excel
+      </a>
+    </form>
+  </div>
+
+  <!-- Show data only if a view is selected -->
+  {% if data %}
+    <!-- Statistics -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-number">{{ paginator.count }}</div>
+        <div class="stat-label">Total produits</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">{{ products_with_stock }}</div>
+        <div class="stat-label">Avec stock (page)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">{{ products_without_stock }}</div>
+        <div class="stat-label">Sans stock (page)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">{{ page.start_index }}-{{ page.end_index }}</div>
+        <div class="stat-label">Affichage ({{ page.number }}/{{ paginator.num_pages }})</div>
+      </div>
+    </div>
+
+    <!-- Main content -->
+    <div class="card">
+      <div style="padding:12px 16px; border-bottom:1px solid var(--ring); background:#f8fafc;">
+        <h2 style="margin:0; font-size:1.1rem; font-weight:800;">
+          {% if view_type == 'warehouse' %}
+            Stock de l'entrepôt ({{ warehouse_sp.name|default:"Entrepôt" }})
+          {% else %}
+            Stock du point de vente: {{ selected_salespoint.name }}
+          {% endif %}
+        </h2>
+      </div>
+      <div style="overflow:auto;">
+        <table class="table">
+          <thead>
+            {% if view_type == 'warehouse' %}
+            <tr>
+              <th>Statut</th>
+              <th>Produit</th>
+              <th>Marque</th>
+              <th>Ouverture</th>
+              <th>Vendu</th>
+              <th>Restant</th>
+              <th>Disponible</th>
+              <th>En transit</th>
+              <th>Confirmé</th>
+            </tr>
+            {% else %}
+            <tr>
+              <th>Statut</th>
+              <th>Produit</th>
+              <th>Marque</th>
+              <th>Ouverture</th>
+              <th>Vendu</th>
+              <th>Restant</th>
+              <th>Réservé</th>
+              <th>Disponible</th>
+              <th>Seuil</th>
+            </tr>
+            {% endif %}
+          </thead>
+          <tbody>
+            {% for item in data %}
+            <tr style="{% if not item.has_stock %}opacity:0.7;{% endif %}">
+              <td>
+                {% if item.has_stock %}
+                  {% if item.remaining_qty == 0 %}
+                    <span class="stock-status status-no-stock">Épuisé</span>
+                  {% elif item.remaining_qty <= 5 %}
+                    <span class="stock-status status-low-stock">Stock bas</span>
+                  {% else %}
+                    <span class="stock-status status-in-stock">En stock</span>
+                  {% endif %}
+                {% else %}
+                  <span class="stock-status status-no-stock">Sans stock</span>
+                {% endif %}
+              </td>
+              <td class="{% if item.has_stock %}has-stock{% else %}no-stock{% endif %}">{{ item.product.name }}</td>
+              <td>{{ item.product.brand.name|default:'—' }}</td>
+              <td class="{% if not item.has_stock %}no-stock{% endif %}">{{ item.opening_qty }}</td>
+              <td class="{% if not item.has_stock %}no-stock{% endif %}">{{ item.sold_qty }}</td>
+              {% if view_type == 'warehouse' %}
+              <td class="{% if not item.has_stock %}no-stock{% elif item.remaining_qty == 0 %}stock-zero{% elif item.remaining_qty <= 5 %}stock-low{% else %}stock-ok{% endif %}">
+                {{ item.remaining_qty }}
+              </td>
+              <td class="{% if not item.has_stock %}no-stock{% elif item.available_qty == 0 %}stock-zero{% elif item.available_qty <= 5 %}stock-low{% else %}stock-ok{% endif %}">
+                {{ item.available_qty }}
+              </td>
+              <td class="{% if not item.has_stock %}no-stock{% else %}stock-info{% endif %}">{{ item.transit_qty }}</td>
+              <td class="{% if not item.has_stock %}no-stock{% else %}stock-success{% endif %}">{{ item.confirmed_qty }}</td>
+              {% else %}
+              <td class="{% if not item.has_stock %}no-stock{% elif item.remaining_qty == 0 %}stock-zero{% elif item.remaining_qty <= item.alert_qty %}stock-alert{% else %}stock-ok{% endif %}">
+                {{ item.remaining_qty }}
+              </td>
+              <td class="{% if not item.has_stock %}no-stock{% endif %}">{{ item.reserved_qty }}</td>
+              <td class="{% if not item.has_stock %}no-stock{% elif item.available_qty == 0 %}stock-zero{% elif item.available_qty <= item.alert_qty %}stock-alert{% else %}stock-ok{% endif %}">
+                {{ item.available_qty }}
+              </td>
+              <td class="{% if not item.has_stock %}no-stock{% endif %}">{{ item.alert_qty }}</td>
+              {% endif %}
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="{% if view_type == 'warehouse' %}9{% else %}9{% endif %}" style="color:#64748b; padding:1rem .9rem; font-weight:700;">
+                {% if view_type == 'warehouse' %}
+                  Aucun stock en entrepôt.
+                {% else %}
+                  Aucun stock trouvé pour ce point de vente.
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      
+      <!-- Pagination -->
+      {% if paginator.num_pages > 1 %}
+      <div class="pagination">
+        {% if page.has_previous %}
+          <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page=1" class="btn">« Première</a>
+          <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page.previous_page_number }}" class="btn">‹ Précédente</a>
+        {% else %}
+          <span class="disabled">« Première</span>
+          <span class="disabled">‹ Précédente</span>
+        {% endif %}
+        
+        {% for num in page.paginator.page_range %}
+          {% if page.number == num %}
+            <span class="current">{{ num }}</span>
+          {% elif num > page.number|add:'-3' and num < page.number|add:'3' %}
+            <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ num }}" class="btn">{{ num }}</a>
+          {% endif %}
+        {% endfor %}
+        
+        {% if page.has_next %}
+          <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page.next_page_number }}" class="btn">Suivante ›</a>
+          <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ paginator.num_pages }}" class="btn">Dernière »</a>
+        {% else %}
+          <span class="disabled">Suivante ›</span>
+          <span class="disabled">Dernière »</span>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+  {% else %}
+    <!-- No data selected message -->
+    <div class="card" style="text-align:center; padding:3rem 2rem;">
+      <div style="font-size:3rem; margin-bottom:1rem;">📊</div>
+      <h2 style="margin:0 0 1rem 0; color:#64748b;">Sélectionnez une vue pour commencer</h2>
+      <p style="color:#94a3b8; margin:0;">
+        {% if view_type == 'salespoint' and not sp_id %}
+          Choisissez un point de vente dans la liste déroulante ci-dessus.
+        {% else %}
+          Utilisez les filtres ci-dessus pour afficher les stocks.
+        {% endif %}
+      </p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  var form = document.querySelector('form[method="get"]');
+  var viewTypeRadios = form.querySelectorAll('input[name="view"]');
+  var salespointSelect = form.querySelector('select[name="sp"]');
+  var searchInput = form.querySelector('input[name="q"]');
+  var perPageSelect = form.querySelector('select[name="per_page"]');
+  
+  // Auto-submit on view type change
+  viewTypeRadios.forEach(function(radio) {
+    radio.addEventListener('change', function() {
+      // Clear salespoint selection when switching to warehouse
+      if (this.value === 'warehouse') {
+        salespointSelect.value = '';
+      }
+      form.submit();
+    });
+  });
+  
+  // Auto-submit on salespoint selection
+  if (salespointSelect) {
+    salespointSelect.addEventListener('change', function() {
+      if (this.value) {
+        form.submit();
+      }
+    });
+  }
+  
+  // Search input with debounce
+  var searchTimeout;
+  searchInput.addEventListener('input', function() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(function() {
+      form.submit();
+    }, 500);
+  });
+  
+  // Product type change
+  var productTypeRadios = form.querySelectorAll('input[name="type"]');
+  productTypeRadios.forEach(function(radio) {
+    radio.addEventListener('change', function() {
+      form.submit();
+    });
+  });
+  
+  // Per page change
+  if (perPageSelect) {
+    perPageSelect.addEventListener('change', function() {
+      form.submit();
+    });
+  }
+});
+</script>
+{% endblock %}
+

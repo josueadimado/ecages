@@ -1,0 +1,70 @@
+{% extends "layouts/base_sales.html" %}
+{% block title %}Historique des demandes de réapprovisionnement | ECAGES{% endblock %}
+{% block content %}
+<div class="page">
+  <div class="ribbon"><div class="marquee"><span id="ribbonText">ECAGES • MAGASIN (DIRECTION GENERALE) • {{ "now"|date:"d/m/Y H:i" }}</span></div></div>
+  <div class="card" style="margin-bottom:12px; padding:12px 16px;">
+    <form method="get" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+      <label>Point de vente
+        <select name="sp">
+          <option value="0">Tous</option>
+          {% for s in salespoints %}
+          <option value="{{ s.id }}" {% if sp_id == s.id %}selected{% endif %}>{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <input name="q" placeholder="Produit" value="{{ q }}" />
+      <button class="btn">Filtrer</button>
+    </form>
+  </div>
+  <div class="card" style="overflow:auto;">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Référence</th>
+          <th>Point de vente</th>
+          <th>Statut</th>
+          <th>Produits</th>
+          <th>Quantité</th>
+          <th>Valeur</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>{{ r.created_at|date:"d/m/Y H:i" }}</td>
+          <td>
+            {% if r.reference %}{{ r.reference }}{% else %}#{{ r.id }}{% endif %}
+          </td>
+          <td>{{ r.salespoint.name }}</td>
+          <td>
+            <span class="badge 
+              {% if r.status == 'sent' %}badge-warning
+              {% elif r.status == 'validated' %}badge-success
+              {% elif r.status == 'partially_validated' %}badge-info
+              {% else %}badge-secondary{% endif %}">
+              {{ r.get_status_display }}
+            </span>
+          </td>
+          <td>{{ r.lines.count }}</td>
+          <td>
+            {% for line in r.lines.all %}
+              {{ line.quantity_requested|default:0 }}{% if not forloop.last %}, {% endif %}
+            {% endfor %}
+          </td>
+          <td>
+            {% for line in r.lines.all %}
+              {{ line.quantity_requested|default:0 }} × {{ line.product.cost_price|default:0|floatformat:0 }}{% if not forloop.last %}, {% endif %}
+            {% endfor %} FCFA
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" style="color:#64748b; padding:1rem .9rem; font-weight:700;">Aucune demande de réapprovisionnement.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+

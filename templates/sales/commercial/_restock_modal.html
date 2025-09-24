@@ -1,0 +1,532 @@
+<div id="restockModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; backdrop-filter:blur(2px);">
+  <div style="max-width:1000px; margin:1% auto; background:#fff; border-radius:16px; padding:0; border:1px solid #e5e7eb; max-height:95vh; overflow:hidden; box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);">
+    
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg, #6e0a0a 0%, #8b0a0a 100%); color:#fff; padding:24px; border-radius:16px 16px 0 0;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h2 style="font-weight:700; font-size:1.5rem; margin:0;" id="restockModalTitle">Nouvelle Ravitaillement</h2>
+          <p style="margin:4px 0 0 0; opacity:0.9; font-size:0.95rem;">Ajoutez des produits à votre commande de réapprovisionnement</p>
+        </div>
+        <button type="button" onclick="closeRestockModal()" style="background:rgba(255,255,255,0.2); color:#fff; border:none; padding:12px; border-radius:8px; cursor:pointer; font-size:1.2rem; transition:all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'">✕</button>
+      </div>
+    </div>
+    
+    <!-- Content -->
+    <div style="padding:24px; max-height:calc(95vh - 120px); overflow-y:auto;">
+      
+      <!-- Order Details Card -->
+      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:20px; margin-bottom:24px;">
+        <h3 style="font-weight:600; margin:0 0 16px 0; color:#374151; font-size:1.1rem;">📋 Détails de la commande</h3>
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px;">
+          <div>
+            <label style="display:block; font-weight:500; margin-bottom:6px; color:#6b7280; font-size:0.9rem;">Numéro de ravitaillement</label>
+            <input type="text" id="rm_ref" readonly style="width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:8px; background:#e5e7eb; font-weight:600; color:#374151;" />
+          </div>
+          <div>
+            <label style="display:block; font-weight:500; margin-bottom:6px; color:#6b7280; font-size:0.9rem;">Date</label>
+            <input type="text" id="rm_date" readonly style="width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:8px; background:#e5e7eb; font-weight:500; color:#374151;" />
+          </div>
+          <div>
+            <label style="display:block; font-weight:500; margin-bottom:6px; color:#6b7280; font-size:0.9rem;">Fournisseur *</label>
+            <select id="rm_provider" required style="width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:8px; background:#fff; font-size:0.95rem;">
+              <option value="">Sélectionner un fournisseur</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Total Amount Card -->
+      <div style="background:linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border:1px solid #f59e0b; border-radius:12px; padding:16px; margin-bottom:24px; text-align:center;">
+        <div style="display:flex; align-items:center; justify-content:center; gap:8px;">
+          <span style="font-weight:600; font-size:1.1rem; color:#92400e;">💰 Montant total:</span>
+          <span id="rm_total_amount" style="font-weight:800; font-size:1.4rem; color:#b45309;">0 FCFA</span>
+        </div>
+      </div>
+      
+      <!-- Product Search Card -->
+      <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:20px; margin-bottom:24px;">
+        <h3 style="font-weight:600; margin:0 0 16px 0; color:#374151; font-size:1.1rem;">🔍 Rechercher et ajouter des produits</h3>
+        
+        <!-- Search Input -->
+        <div style="position:relative; margin-bottom:16px;">
+          <label style="display:block; font-weight:500; margin-bottom:6px; color:#6b7280; font-size:0.9rem;">Rechercher un produit</label>
+          <input type="text" id="rm_product_search" placeholder="Tapez le nom, la marque ou la référence du produit..." style="width:100%; padding:12px 16px; border:2px solid #e2e8f0; border-radius:10px; font-size:1rem; transition:all 0.2s;" onfocus="this.style.borderColor='#667eea'" onblur="this.style.borderColor='#e2e8f0'" />
+          <div id="rm_product_suggestions" style="position:absolute; top:100%; left:0; right:0; background:#fff; border:1px solid #d1d5db; border-radius:8px; max-height:200px; overflow-y:auto; z-index:1001; display:none; box-shadow:0 10px 25px -5px rgba(0,0,0,0.1);"></div>
+        </div>
+        
+        <!-- Product Details Form -->
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr 1fr auto; gap:12px; align-items:end;">
+          <div>
+            <label style="display:block; font-weight:500; margin-bottom:6px; color:#6b7280; font-size:0.9rem;">Quantité *</label>
+            <input type="number" id="rm_quantity" placeholder="0" min="1" style="width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:0.95rem;" />
+          </div>
+          <div>
+            <label style="display:block; font-weight:500; margin-bottom:6px; color:#6b7280; font-size:0.9rem;">Prix d'achat (FCFA)</label>
+            <input type="number" id="rm_cost_price" placeholder="0" step="0.01" style="width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:0.95rem;" />
+          </div>
+          <div>
+            <label style="display:block; font-weight:500; margin-bottom:6px; color:#6b7280; font-size:0.9rem;">Prix de gros (FCFA)</label>
+            <input type="number" id="rm_wholesale_price" placeholder="0" step="0.01" style="width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:0.95rem;" />
+          </div>
+          <div>
+            <label style="display:block; font-weight:500; margin-bottom:6px; color:#6b7280; font-size:0.9rem;">Prix de vente (FCFA)</label>
+            <input type="number" id="rm_selling_price" placeholder="0" step="0.01" style="width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:0.95rem;" />
+          </div>
+          <div>
+            <button type="button" id="rm_add_product" style="background:linear-gradient(135deg, #10b981 0%, #059669 100%); color:#fff; border:none; padding:12px 20px; border-radius:8px; font-weight:600; cursor:pointer; transition:all 0.2s; white-space:nowrap;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='translateY(0)'">
+              ➕ Ajouter
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Selected Products Card -->
+      <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:20px; margin-bottom:24px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <h3 style="font-weight:600; margin:0; color:#374151; font-size:1.1rem;">🛒 Produits sélectionnés</h3>
+          <div style="color:#6b7280; font-size:0.9rem;">
+            <span id="rm_items_count">0 produits</span> • 
+            <span id="rm_total_quantity">0 unités</span>
+          </div>
+        </div>
+        
+        <div id="rm_products_table" style="border:1px solid #e2e8f0; border-radius:8px; overflow:hidden;">
+          <table style="width:100%; border-collapse:collapse;">
+            <thead style="background:#f8fafc;">
+              <tr>
+                <th style="padding:16px; text-align:left; font-weight:600; border-bottom:1px solid #e2e8f0; color:#374151;">Produit</th>
+                <th style="padding:16px; text-align:center; font-weight:600; border-bottom:1px solid #e2e8f0; color:#374151;">Qté</th>
+                <th style="padding:16px; text-align:right; font-weight:600; border-bottom:1px solid #e2e8f0; color:#374151;">Prix Achat</th>
+                <th style="padding:16px; text-align:right; font-weight:600; border-bottom:1px solid #e2e8f0; color:#374151;">Prix Gros</th>
+                <th style="padding:16px; text-align:right; font-weight:600; border-bottom:1px solid #e2e8f0; color:#374151;">Prix Vente</th>
+                <th style="padding:16px; text-align:right; font-weight:600; border-bottom:1px solid #e2e8f0; color:#374151;">Total</th>
+                <th style="padding:16px; text-align:center; font-weight:600; border-bottom:1px solid #e2e8f0; color:#374151;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="rm_products_tbody">
+              <tr id="rm_no_products">
+                <td colspan="7" style="padding:48px; text-align:center; color:#9ca3af; font-style:italic;">
+                  <div style="font-size:3rem; margin-bottom:12px;">📦</div>
+                  <div>Aucun produit sélectionné</div>
+                  <div style="font-size:0.9rem; margin-top:4px;">Commencez par rechercher et ajouter des produits</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
+      <!-- Action Buttons -->
+      <div style="display:flex; justify-content:space-between; align-items:center; padding-top:16px; border-top:1px solid #e2e8f0;">
+        <div style="color:#6b7280; font-size:0.9rem;">
+          💡 <strong>Astuce:</strong> Vous pouvez ajouter plusieurs produits avant de soumettre votre demande
+        </div>
+        <div style="display:flex; gap:12px;">
+          <button type="button" onclick="closeRestockModal()" style="background:#f3f4f6; color:#374151; border:1px solid #d1d5db; padding:12px 24px; border-radius:8px; font-weight:500; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='#f3f4f6'">
+            Annuler
+          </button>
+          <button type="button" id="rm_submit" onclick="submitRestock()" disabled style="background:linear-gradient(135deg, #6e0a0a 0%, #8b0a0a 100%); color:#fff; border:none; padding:12px 24px; border-radius:8px; font-weight:600; cursor:pointer; transition:all 0.3s ease; opacity:0.5;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='translateY(0)'">
+            🚀 Soumettre la demande
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Restock Modal JavaScript
+window.selectedProducts = [];
+window.currentProduct = null;
+
+// Generate invoice number for commercial director restock
+function generateInvoiceNumber(kind) {
+  const now = new Date();
+  // Format as DDMMYY instead of YYYYMMDD
+  const day = now.getDate().toString().padStart(2, '0');
+  const month = (now.getMonth() + 1).toString().padStart(2, '0');
+  const year = now.getFullYear().toString().slice(-2);
+  const date = day + month + year; // DDMMYY format
+  const typeCode = kind === 'moto' ? 'M' : 'P';
+  
+  // Get the current sequential number for today's date and type (don't increment yet)
+  const todayKey = `cd_${date}_${typeCode.toLowerCase()}`;
+  let currentNumber = parseInt(localStorage.getItem(todayKey) || '0');
+  
+  // Format as 4-digit number with leading zeros
+  const sequenceNumber = (currentNumber + 1).toString().padStart(4, '0');
+  
+  return `CD-${date}-${typeCode}-${sequenceNumber}`;
+}
+
+// Format date
+function formatDate() {
+  const now = new Date();
+  return now.toLocaleDateString('fr-FR') + ', ' + now.toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'});
+}
+
+// Initialize modal
+window.initRestockModal = function(kind) {
+  console.log('=== INITIALIZING RESTOCK MODAL ===');
+  console.log('Kind:', kind);
+  
+  // Generate a temporary invoice number for display (will be replaced by server)
+  document.getElementById('rm_ref').value = generateInvoiceNumber(kind);
+  document.getElementById('rm_date').value = formatDate();
+  document.getElementById('restockModalTitle').textContent = kind === 'moto' ? 'Nouvelle Ravitaillement en Moto(s)' : 'Nouvelle Ravitaillement en Pièce(s)';
+  window.selectedProducts = [];
+  window.currentKind = kind; // Store the current type for filtering
+  console.log('Modal initialized, selectedProducts:', window.selectedProducts);
+  
+  // Attach event listener to add product button
+  const addProductBtn = document.getElementById('rm_add_product');
+  if (addProductBtn) {
+    // Remove any existing event listeners by cloning the button
+    const newBtn = addProductBtn.cloneNode(true);
+    addProductBtn.parentNode.replaceChild(newBtn, addProductBtn);
+    newBtn.addEventListener('click', addProductToList);
+    console.log('Add product button event listener attached');
+  } else {
+    console.error('Add product button not found during initialization');
+  }
+  
+  updateProductsTable();
+  loadProviders();
+}
+
+// Load providers
+async function loadProviders() {
+  try {
+    const response = await fetch('/providers/api/providers/');
+    const data = await response.json();
+    const select = document.getElementById('rm_provider');
+    select.innerHTML = '<option value="">Sélectionner un fournisseur</option>';
+    data.providers.forEach(provider => {
+      const option = document.createElement('option');
+      option.value = provider.id;
+      option.textContent = provider.name;
+      select.appendChild(option);
+    });
+  } catch (error) {
+    console.error('Error loading providers:', error);
+  }
+}
+
+// Product search
+document.getElementById('rm_product_search').addEventListener('input', function(e) {
+  const query = e.target.value.trim();
+  if (query.length < 2) {
+    document.getElementById('rm_product_suggestions').style.display = 'none';
+    return;
+  }
+  
+  // Search products with type filter
+  const currentKind = window.currentKind || 'piece';
+  fetch(`/products/api/search/?q=${encodeURIComponent(query)}&type=${currentKind}`)
+    .then(response => response.json())
+    .then(data => {
+      const suggestions = document.getElementById('rm_product_suggestions');
+      suggestions.innerHTML = '';
+      
+      if (data.products && data.products.length > 0) {
+        data.products.forEach(product => {
+          // Double-check type filtering on client side
+          if (product.product_type === currentKind) {
+            const div = document.createElement('div');
+            div.className = 'suggestion-item';
+            div.style.cssText = 'padding:12px 16px; cursor:pointer; border-bottom:1px solid #f3f4f6; transition:all 0.2s;';
+            div.innerHTML = `
+              <div style="font-weight:600; color:#374151; margin-bottom:4px;">${product.name}</div>
+              <div style="font-size:0.85rem; color:#6b7280;">${product.brand || 'Sans marque'} • ${product.sku || 'N/A'}</div>
+            `;
+            div.addEventListener('mouseenter', () => {
+              div.style.background = '#f8fafc';
+            });
+            div.addEventListener('mouseleave', () => {
+              div.style.background = '#fff';
+            });
+            div.addEventListener('click', () => selectProduct(product));
+            suggestions.appendChild(div);
+          }
+        });
+        suggestions.style.display = suggestions.children.length > 0 ? 'block' : 'none';
+      } else {
+        suggestions.style.display = 'none';
+      }
+    })
+    .catch(error => {
+      console.error('Error searching products:', error);
+      document.getElementById('rm_product_suggestions').style.display = 'none';
+    });
+});
+
+// Select product
+window.selectProduct = function(product) {
+  window.currentProduct = product;
+  document.getElementById('rm_product_search').value = product.name;
+  document.getElementById('rm_cost_price').value = product.cost_price || 0;
+  document.getElementById('rm_wholesale_price').value = product.wholesale_price || 0;
+  document.getElementById('rm_selling_price').value = product.selling_price || 0;
+  document.getElementById('rm_product_suggestions').style.display = 'none';
+  document.getElementById('rm_quantity').focus();
+}
+
+// Add product to list function
+function addProductToList() {
+  console.log('=== ADD PRODUCT CLICKED ===');
+  
+  if (!window.currentProduct) {
+    alert('Veuillez sélectionner un produit');
+    return;
+  }
+  
+  const quantity = parseInt(document.getElementById('rm_quantity').value) || 0;
+  const costPrice = parseFloat(document.getElementById('rm_cost_price').value) || 0;
+  const wholesalePrice = parseFloat(document.getElementById('rm_wholesale_price').value) || 0;
+  const sellingPrice = parseFloat(document.getElementById('rm_selling_price').value) || 0;
+  
+  if (quantity <= 0) {
+    alert('Veuillez entrer une quantité valide');
+    return;
+  }
+  
+  // Create new product object
+  const newProduct = {
+    id: window.currentProduct.id,
+    name: window.currentProduct.name,
+    brand: window.currentProduct.brand,
+    sku: window.currentProduct.sku,
+    quantity: quantity,
+    cost_price: costPrice,
+    wholesale_price: wholesalePrice,
+    selling_price: sellingPrice,
+    total_cost: quantity * costPrice
+  };
+  
+  // Check if product already exists
+  const existingIndex = window.selectedProducts.findIndex(p => p.id === window.currentProduct.id);
+  if (existingIndex >= 0) {
+    window.selectedProducts[existingIndex].quantity += quantity;
+    window.selectedProducts[existingIndex].total_cost = window.selectedProducts[existingIndex].quantity * costPrice;
+    console.log('Updated existing product at index:', existingIndex);
+  } else {
+    window.selectedProducts.push(newProduct);
+    console.log('Added new product:', newProduct);
+  }
+  
+  console.log('Total selected products:', window.selectedProducts.length);
+  
+  // Clear form
+  window.currentProduct = null;
+  document.getElementById('rm_product_search').value = '';
+  document.getElementById('rm_quantity').value = '';
+  document.getElementById('rm_cost_price').value = '';
+  document.getElementById('rm_wholesale_price').value = '';
+  document.getElementById('rm_selling_price').value = '';
+  
+  updateProductsTable();
+}
+
+// Update products table
+window.updateProductsTable = function() {
+  console.log('=== UPDATING PRODUCTS TABLE ===');
+  console.log('Selected products count:', window.selectedProducts.length);
+  console.log('Selected products:', window.selectedProducts);
+  
+  const tbody = document.getElementById('rm_products_tbody');
+  const totalAmount = document.getElementById('rm_total_amount');
+  const itemsCount = document.getElementById('rm_items_count');
+  const totalQuantity = document.getElementById('rm_total_quantity');
+  const submitBtn = document.getElementById('rm_submit');
+  
+  // Check if elements exist
+  if (!tbody || !totalAmount || !itemsCount || !totalQuantity || !submitBtn) {
+    console.error('Required elements not found in DOM');
+    return;
+  }
+  
+  if (window.selectedProducts.length === 0) {
+    console.log('No products, showing empty state');
+    tbody.innerHTML = '<tr id="rm_no_products"><td colspan="7" style="padding:40px; text-align:center; color:#6b7280;">Aucun produit sélectionné</td></tr>';
+    totalAmount.textContent = '0 FCFA';
+    itemsCount.textContent = '0 produits';
+    totalQuantity.textContent = '0 unités';
+    submitBtn.disabled = true;
+    submitBtn.style.opacity = '0.5';
+    return;
+  }
+  
+  console.log('Rendering products table');
+  tbody.innerHTML = '';
+  
+  let total = 0;
+  let totalQty = 0;
+  
+  window.selectedProducts.forEach((product, index) => {
+    console.log('Rendering product:', product.name, 'at index:', index);
+    const row = document.createElement('tr');
+    row.style.cssText = 'transition:all 0.2s;';
+    row.innerHTML = `
+      <td style="padding:16px; border-bottom:1px solid #e2e8f0;">
+        <div style="font-weight:600; color:#374151; margin-bottom:4px;">${product.name}</div>
+        <div style="font-size:0.85rem; color:#6b7280;">${product.brand || 'Sans marque'} • ${product.sku || 'N/A'}</div>
+      </td>
+      <td style="padding:16px; text-align:center; border-bottom:1px solid #e2e8f0; font-weight:600; color:#374151;">${product.quantity}</td>
+      <td style="padding:16px; text-align:right; border-bottom:1px solid #e2e8f0; color:#374151;">${product.cost_price.toLocaleString()} FCFA</td>
+      <td style="padding:16px; text-align:right; border-bottom:1px solid #e2e8f0; color:#374151;">${product.wholesale_price.toLocaleString()} FCFA</td>
+      <td style="padding:16px; text-align:right; border-bottom:1px solid #e2e8f0; color:#374151;">${product.selling_price.toLocaleString()} FCFA</td>
+      <td style="padding:16px; text-align:right; border-bottom:1px solid #e2e8f0; font-weight:700; color:#059669; font-size:1.05rem;">${product.total_cost.toLocaleString()} FCFA</td>
+      <td style="padding:16px; text-align:center; border-bottom:1px solid #e2e8f0;">
+        <button type="button" onclick="removeProduct(${index})" style="background:linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color:#fff; border:none; padding:8px 16px; border-radius:6px; cursor:pointer; font-size:0.85rem; font-weight:500; transition:all 0.2s;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='translateY(0)'">
+          🗑️ Supprimer
+        </button>
+      </td>
+    `;
+    row.addEventListener('mouseenter', () => {
+      row.style.background = '#f8fafc';
+    });
+    row.addEventListener('mouseleave', () => {
+      row.style.background = '#fff';
+    });
+    tbody.appendChild(row);
+    
+    total += product.total_cost;
+    totalQty += product.quantity;
+  });
+  
+  totalAmount.textContent = total.toLocaleString() + ' FCFA';
+  itemsCount.textContent = window.selectedProducts.length + ' produit' + (window.selectedProducts.length > 1 ? 's' : '');
+  totalQuantity.textContent = totalQty.toLocaleString() + ' unité' + (totalQty > 1 ? 's' : '');
+  submitBtn.disabled = false;
+  submitBtn.style.opacity = '1';
+  
+  console.log('Table updated successfully with', window.selectedProducts.length, 'products');
+}
+
+// Remove product
+window.removeProduct = function(index) {
+  console.log('Removing product at index:', index);
+  console.log('Selected products before removal:', window.selectedProducts);
+  if (index >= 0 && index < window.selectedProducts.length) {
+    window.selectedProducts.splice(index, 1);
+    console.log('Selected products after removal:', window.selectedProducts);
+    updateProductsTable();
+  } else {
+    console.error('Invalid index for removal:', index);
+  }
+}
+
+// Submit restock
+window.submitRestock = async function() {
+  const provider = document.getElementById('rm_provider').value;
+  const currentKind = window.currentKind || 'piece';
+  
+  if (!provider) {
+    alert('Veuillez sélectionner un fournisseur');
+    return;
+  }
+  
+  if (window.selectedProducts.length === 0) {
+    alert('Veuillez ajouter au moins un produit');
+    return;
+  }
+  
+  const data = {
+    provider_id: provider,
+    kind: currentKind,
+    products: window.selectedProducts
+  };
+  
+  try {
+    const response = await fetch('/sales/api/commercial/restock/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken')
+      },
+      body: JSON.stringify(data)
+    });
+    
+    const result = await response.json();
+    
+    if (response.ok && result.success) {
+      const invoiceNumber = result.invoice_number || 'N/A';
+      
+      // Increment the counter only after successful submission
+      const now = new Date();
+      const day = now.getDate().toString().padStart(2, '0');
+      const month = (now.getMonth() + 1).toString().padStart(2, '0');
+      const year = now.getFullYear().toString().slice(-2);
+      const date = day + month + year;
+      const typeCode = currentKind === 'moto' ? 'M' : 'P';
+      const todayKey = `cd_${date}_${typeCode.toLowerCase()}`;
+      const currentNumber = parseInt(localStorage.getItem(todayKey) || '0');
+      localStorage.setItem(todayKey, (currentNumber + 1).toString());
+      
+      alert(`Demande de ravitaillement ${currentKind === 'moto' ? 'Motos' : 'Pièces'} envoyée avec succès\nFacture: ${invoiceNumber}`);
+      closeRestockModal();
+      // Optionally refresh the page or update UI
+    } else {
+      alert('Erreur: ' + (result.message || 'Impossible d\'envoyer la demande'));
+    }
+  } catch (error) {
+    console.error('Error submitting restock:', error);
+    alert('Erreur lors de l\'envoi de la demande');
+  }
+}
+
+// Close modal
+window.closeRestockModal = function() {
+  document.getElementById('restockModal').style.display = 'none';
+  window.selectedProducts = [];
+  window.currentProduct = null;
+  window.currentKind = null;
+  document.getElementById('rm_product_search').value = '';
+  document.getElementById('rm_quantity').value = '';
+  document.getElementById('rm_cost_price').value = '';
+  document.getElementById('rm_wholesale_price').value = '';
+  document.getElementById('rm_selling_price').value = '';
+  document.getElementById('rm_provider').value = '';
+}
+
+// Get CSRF token
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+
+// Test function to add a product directly
+function testAddProduct() {
+  console.log('=== TEST ADD PRODUCT ===');
+  
+  // Create a test product
+  const testProduct = {
+    id: 999,
+    name: 'Test Product',
+    brand: 'Test Brand',
+    sku: 'TEST-001',
+    quantity: 1,
+    cost_price: 1000,
+    wholesale_price: 1200,
+    selling_price: 1500,
+    total_cost: 1000
+  };
+  
+  window.selectedProducts.push(testProduct);
+  console.log('Added test product, total products:', window.selectedProducts.length);
+  updateProductsTable();
+}
+
+// Event listeners are now attached in initRestockModal function
+</script>

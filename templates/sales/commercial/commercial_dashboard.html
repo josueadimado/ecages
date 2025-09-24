@@ -1,0 +1,105 @@
+{% extends "layouts/base_sales.html" %}
+{% block title %}Tableau de bord Commercial{% endblock %}
+{% block extra_css %}
+<style>
+  .commercial-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+  .commercial-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .commercial-title { font-size: 1.5rem; font-weight: 900; color: #1e293b; }
+  .btn-primary { background: #580706; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 700; cursor: pointer; }
+  .btn-primary:hover { background: #460504; }
+  .btn-secondary { background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; }
+  .btn-secondary:hover { background: #f1f5f9; }
+  .products-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+  .products-table thead th { background: #f8fafc; padding: 12px; text-align: left; font-weight: 700; color: #475569; border-bottom: 2px solid #e2e8f0; }
+  .products-table tbody td { padding: 12px; border-bottom: 1px solid #f1f5f9; }
+  .products-table tbody tr:hover { background: #f8fafc; }
+  .price-input { width: 100px; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.9rem; }
+  .price-input:focus { outline: none; border-color: #580706; box-shadow: 0 0 0 2px rgba(88, 7, 6, 0.1); }
+  .brand-badge { background: #e0f2fe; color: #0369a1; padding: 4px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px; }
+  .stat-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; text-align: center; }
+  .stat-number { font-size: 2rem; font-weight: 900; color: #1e293b; }
+  .stat-label { color: #64748b; font-weight: 600; margin-top: 4px; }
+  .pagination { display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 20px; }
+  .pagination a, .pagination span { padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 6px; text-decoration: none; color: #475569; font-weight: 600; }
+  .pagination .current { background: #580706; color: #fff; border-color: #580706; }
+  .pagination a:hover { background: #f8fafc; }
+  .search-box { width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 1rem; margin-bottom: 20px; }
+  .search-box:focus { outline: none; border-color: #580706; }
+  .restock-section { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-top: 20px; }
+  .restock-title { font-size: 1.2rem; font-weight: 800; color: #1e293b; margin-bottom: 12px; }
+  .restock-buttons { display: flex; gap: 12px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page">
+  <div class="ribbon">
+    <div class="marquee">
+      <span id="ribbonText">ECAGES • Tableau de bord Commercial</span>
+    </div>
+  </div>
+
+  <!-- Statistics -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-number">{{ total_products }}</div>
+      <div class="stat-label">Produits actifs</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">{{ products|length }}</div>
+      <div class="stat-label">Produits affichés</div>
+    </div>
+  </div>
+
+  <!-- Search and Actions -->
+  <div class="commercial-card">
+    <div class="commercial-header">
+      <div class="commercial-title">Gestion des Produits</div>
+      <div>
+        <button class="btn-secondary" id="btnExport">Exporter</button>
+        <button class="btn-primary" onclick="updateAllPrices()">Mettre à jour les prix</button>
+      </div>
+    </div>
+    
+    <form method="get" action="" style="margin:0">
+      <input type="text" class="search-box" id="searchBox" name="q" value="{{ q|default:'' }}" placeholder="Rechercher un produit, une marque ou tapez 'moto' / 'pièce'..." />
+    </form>
+    <div style="display:flex; gap:.5rem; flex-wrap:wrap; margin-top:-10px; margin-bottom:10px;">
+      {% with query=q|default:''|lower t=type|default:''|lower %}
+        <a href="?" class="btn-secondary" style="padding:6px 10px; {% if not query and not t %}background:#580706;color:#fff;border-color:#580706{% endif %}">Tous</a>
+        <a href="?type=moto" class="btn-secondary" style="padding:6px 10px; {% if t == 'moto' %}background:#580706;color:#fff;border-color:#580706{% endif %}">Motos</a>
+        <a href="?type=piece" class="btn-secondary" style="padding:6px 10px; {% if t == 'piece' %}background:#580706;color:#fff;border-color:#580706{% endif %}">Pièces</a>
+      {% endwith %}
+    </div>
+    
+    <div class="restock-section">
+      <div class="restock-title">Réapprovisionnement Entrepôt</div>
+      <div class="restock-buttons">
+        <button type="button" class="btn-primary" id="btnRestockMoto">Réapprovisionner Motos</button>
+        <button type="button" class="btn-primary" id="btnRestockPiece">Réapprovisionner Pièces</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Products Table -->
+  <div class="commercial-card" id="productsTableContainer">
+    {% include 'sales/commercial/_table_only.html' %}
+  </div>
+</div>
+{% include 'sales/commercial/_price_modal.html' %}
+{% include 'sales/commercial/_restock_modal.html' %}
+{% endblock %}
+
+{% block extra_js %}
+{% load static %}
+<script>
+  document.addEventListener('DOMContentLoaded', function(){
+    var pm = document.getElementById('priceModal');
+    var rm = document.getElementById('restockModal');
+    if(pm){ pm.dataset.apiPrice = '{% url "sales:api_commercial_price_update" %}'; }
+    if(rm){ rm.dataset.apiRestock = '{% url "sales:api_commercial_restock" %}'; }
+  });
+</script>
+<script src="{% static 'js/sales/commercial_dashboard.js' %}"></script>
+{% endblock %}

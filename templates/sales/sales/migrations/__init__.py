@@ -1,0 +1,1 @@
+     import BaseSale from './layouts/BaseSale'; // Adjust the path as necessary

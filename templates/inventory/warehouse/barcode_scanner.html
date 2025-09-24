@@ -1,0 +1,287 @@
+{% extends "layouts/base_sales.html" %}
+{% block title %}Scanner de codes-barres | ECAGES{% endblock %}
+{% block extra_css %}
+  <style>
+    :root{ --ring:#e5e7eb; --muted:#64748b; }
+    .page{ padding:16px; max-width:800px; margin:0 auto; }
+    .card{ background:#fff; border:1px solid var(--ring); border-radius:12px; box-shadow:0 8px 24px rgba(2,8,23,.06); margin-bottom:20px; }
+    .scanner-section{ padding:24px; text-align:center; }
+    .scanner-input{ width:100%; max-width:400px; padding:12px 16px; border:2px solid var(--ring); border-radius:8px; font-size:16px; margin:16px 0; }
+    .scanner-input:focus{ outline:none; border-color:#007bff; }
+    .scan-button{ background:#007bff; color:#fff; border:none; padding:12px 24px; border-radius:8px; font-size:16px; cursor:pointer; margin:8px; }
+    .scan-button:hover{ background:#0056b3; }
+    .scan-button:disabled{ background:#6c757d; cursor:not-allowed; }
+    .result-section{ padding:24px; }
+    .product-info{ background:#f8f9fa; padding:16px; border-radius:8px; margin:16px 0; }
+    .product-name{ font-size:18px; font-weight:bold; color:#333; margin-bottom:8px; }
+    .product-details{ display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; }
+    .detail-item{ background:#fff; padding:12px; border-radius:6px; border:1px solid var(--ring); }
+    .detail-label{ font-size:12px; color:var(--muted); text-transform:uppercase; font-weight:bold; }
+    .detail-value{ font-size:14px; color:#333; margin-top:4px; }
+    .stock-info{ background:#e8f5e8; border:1px solid #28a745; }
+    .stock-low{ background:#fff3cd; border:1px solid #ffc107; }
+    .stock-out{ background:#f8d7da; border:1px solid #dc3545; }
+    .error-message{ background:#f8d7da; color:#721c24; padding:12px; border-radius:6px; margin:16px 0; }
+    .success-message{ background:#d4edda; color:#155724; padding:12px; border-radius:6px; margin:16px 0; }
+    .loading{ display:none; text-align:center; padding:20px; }
+    .spinner{ border:3px solid #f3f3f3; border-top:3px solid #007bff; border-radius:50%; width:30px; height:30px; animation:spin 1s linear infinite; margin:0 auto; }
+    @keyframes spin{ 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
+    .scan-history{ margin-top:20px; }
+    .history-item{ background:#f8f9fa; padding:12px; border-radius:6px; margin:8px 0; border-left:4px solid #007bff; }
+    .history-time{ font-size:12px; color:var(--muted); }
+    .history-product{ font-weight:bold; margin:4px 0; }
+  </style>
+{% endblock %}
+{% block content %}
+<div class="page">
+  <div class="card">
+    <div class="scanner-section">
+      <h1>📱 Scanner de codes-barres</h1>
+      <p>Scannez un code-barres de produit ou de point de vente pour obtenir des informations détaillées.</p>
+      
+      <div>
+        <input type="text" id="barcodeInput" class="scanner-input" placeholder="Entrez ou scannez un code-barres..." autocomplete="off">
+        <br>
+        <button id="scanProductBtn" class="scan-button">Scanner Produit</button>
+        <button id="scanLocationBtn" class="scan-button">Scanner Point de vente</button>
+        <button id="clearBtn" class="scan-button" style="background:#6c757d;">Effacer</button>
+      </div>
+      
+      <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p>Analyse du code-barres...</p>
+      </div>
+    </div>
+  </div>
+  
+  <div class="card" id="resultCard" style="display:none;">
+    <div class="result-section">
+      <h2 id="resultTitle">Résultat du scan</h2>
+      <div id="resultContent"></div>
+    </div>
+  </div>
+  
+  <div class="card">
+    <div class="result-section">
+      <h3>Historique des scans</h3>
+      <div class="scan-history" id="scanHistory">
+        <p style="color:var(--muted); text-align:center;">Aucun scan effectué</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function(){
+  const barcodeInput = document.getElementById('barcodeInput');
+  const scanProductBtn = document.getElementById('scanProductBtn');
+  const scanLocationBtn = document.getElementById('scanLocationBtn');
+  const clearBtn = document.getElementById('clearBtn');
+  const loading = document.getElementById('loading');
+  const resultCard = document.getElementById('resultCard');
+  const resultTitle = document.getElementById('resultTitle');
+  const resultContent = document.getElementById('resultContent');
+  const scanHistory = document.getElementById('scanHistory');
+  
+  let scanHistoryData = JSON.parse(localStorage.getItem('scanHistory') || '[]');
+  
+  // Load scan history on page load
+  function loadScanHistory() {
+    if (scanHistoryData.length === 0) {
+      scanHistory.innerHTML = '<p style="color:var(--muted); text-align:center;">Aucun scan effectué</p>';
+      return;
+    }
+    
+    scanHistory.innerHTML = scanHistoryData.map(item => `
+      <div class="history-item">
+        <div class="history-time">${item.time}</div>
+        <div class="history-product">${item.type}: ${item.name}</div>
+        <div style="font-size:12px; color:var(--muted);">${item.barcode}</div>
+      </div>
+    `).join('');
+  }
+  
+  // Add to scan history
+  function addToHistory(type, name, barcode) {
+    const now = new Date();
+    const timeStr = now.toLocaleString('fr-FR');
+    
+    scanHistoryData.unshift({
+      type: type,
+      name: name,
+      barcode: barcode,
+      time: timeStr
+    });
+    
+    // Keep only last 20 scans
+    if (scanHistoryData.length > 20) {
+      scanHistoryData = scanHistoryData.slice(0, 20);
+    }
+    
+    localStorage.setItem('scanHistory', JSON.stringify(scanHistoryData));
+    loadScanHistory();
+  }
+  
+  // Show loading state
+  function showLoading() {
+    loading.style.display = 'block';
+    scanProductBtn.disabled = true;
+    scanLocationBtn.disabled = true;
+    resultCard.style.display = 'none';
+  }
+  
+  // Hide loading state
+  function hideLoading() {
+    loading.style.display = 'none';
+    scanProductBtn.disabled = false;
+    scanLocationBtn.disabled = false;
+  }
+  
+  // Show error message
+  function showError(message) {
+    resultCard.style.display = 'block';
+    resultTitle.textContent = 'Erreur';
+    resultContent.innerHTML = `<div class="error-message">${message}</div>`;
+  }
+  
+  // Show success message
+  function showSuccess(message) {
+    resultCard.style.display = 'block';
+    resultTitle.textContent = 'Succès';
+    resultContent.innerHTML = `<div class="success-message">${message}</div>`;
+  }
+  
+  // Show product information
+  function showProductInfo(data) {
+    const stock = data.stock || {};
+    const stockClass = stock.available_qty === 0 ? 'stock-out' : 
+                      (stock.available_qty <= (stock.alert_qty || 5)) ? 'stock-low' : 'stock-info';
+    
+    resultCard.style.display = 'block';
+    resultTitle.textContent = 'Informations du produit';
+    resultContent.innerHTML = `
+      <div class="product-info">
+        <div class="product-name">${data.product.name}</div>
+        <div class="product-details">
+          <div class="detail-item">
+            <div class="detail-label">SKU</div>
+            <div class="detail-value">${data.product.sku || 'N/A'}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Marque</div>
+            <div class="detail-value">${data.product.brand || 'N/A'}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Prix de vente</div>
+            <div class="detail-value">${parseFloat(data.product.retail_price || 0).toLocaleString('fr-FR')} FCFA</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Prix de gros</div>
+            <div class="detail-value">${parseFloat(data.product.wholesale_price || 0).toLocaleString('fr-FR')} FCFA</div>
+          </div>
+          <div class="detail-item ${stockClass}">
+            <div class="detail-label">Stock disponible</div>
+            <div class="detail-value">${stock.available_qty || 0} unités</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Stock total</div>
+            <div class="detail-value">${(stock.opening_qty || 0) + (stock.transfer_in || 0)} unités</div>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    addToHistory('Produit', data.product.name, barcodeInput.value);
+  }
+  
+  // Show salespoint information
+  function showSalespointInfo(data) {
+    resultCard.style.display = 'block';
+    resultTitle.textContent = 'Informations du point de vente';
+    resultContent.innerHTML = `
+      <div class="product-info">
+        <div class="product-name">${data.salespoint.name}</div>
+        <div class="product-details">
+          <div class="detail-item">
+            <div class="detail-label">Adresse</div>
+            <div class="detail-value">${data.salespoint.address || 'N/A'}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Téléphone</div>
+            <div class="detail-value">${data.salespoint.phone || 'N/A'}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Type</div>
+            <div class="detail-value">${data.salespoint.is_warehouse ? 'Entrepôt' : 'Point de vente'}</div>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    addToHistory('Point de vente', data.salespoint.name, barcodeInput.value);
+  }
+  
+  // Scan barcode
+  async function scanBarcode(locationType) {
+    const barcode = barcodeInput.value.trim();
+    if (!barcode) {
+      showError('Veuillez entrer un code-barres');
+      return;
+    }
+    
+    showLoading();
+    
+    try {
+      const response = await fetch('/inventory/api/scan-barcode/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || ''
+        },
+        body: JSON.stringify({
+          barcode: barcode,
+          location_type: locationType
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.ok) {
+        if (data.type === 'product') {
+          showProductInfo(data);
+        } else if (data.type === 'salespoint') {
+          showSalespointInfo(data);
+        }
+      } else {
+        showError(data.error || 'Erreur lors du scan');
+      }
+    } catch (error) {
+      showError('Erreur de connexion: ' + error.message);
+    } finally {
+      hideLoading();
+    }
+  }
+  
+  // Event listeners
+  scanProductBtn.addEventListener('click', () => scanBarcode('product'));
+  scanLocationBtn.addEventListener('click', () => scanBarcode('salespoint'));
+  
+  clearBtn.addEventListener('click', () => {
+    barcodeInput.value = '';
+    resultCard.style.display = 'none';
+  });
+  
+  // Enter key to scan product
+  barcodeInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      scanBarcode('product');
+    }
+  });
+  
+  // Load scan history on page load
+  loadScanHistory();
+})();
+</script>
+{% endblock %}
+

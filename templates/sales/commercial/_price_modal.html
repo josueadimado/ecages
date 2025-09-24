@@ -1,0 +1,20 @@
+<div id="priceModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:1000;">
+  <div style="max-width:560px; margin:10% auto; background:#fff; border-radius:12px; padding:16px; border:1px solid #e5e7eb;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <div style="font-weight:900; font-size:1.1rem;">Mettre à jour le prix</div>
+      <button class="btn-secondary" onclick="closePriceModal()">Fermer</button>
+    </div>
+    <div style="margin-bottom:8px; color:#475569; font-weight:700;">Produit: <span id="pm_name"></span> • <span id="pm_brand"></span></div>
+    <input type="hidden" id="pm_product_id" />
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-top:8px;">
+      <label>Prix d'achat<input id="pm_cost" type="number" step="0.01" min="0" class="price-input" style="width:100%"></label>
+      <label>Prix de gros<input id="pm_wholesale" type="number" step="0.01" min="0" class="price-input" style="width:100%"></label>
+      <label>Prix de vente<input id="pm_selling" type="number" step="0.01" min="0" class="price-input" style="width:100%"></label>
+    </div>
+    <div style="margin-top:14px; text-align:right;">
+      <button class="btn-primary" onclick="submitPriceModal()">Envoyer pour approbation</button>
+    </div>
+  </div>
+</div>
+
+

@@ -1,0 +1,221 @@
+{% extends "layouts/base_sales.html" %}
+{% block title %}Commande — Gérant | ECAGES{% endblock %}
+{% block extra_css %}
+  <style>
+    :root{ --ring:#e5e7eb; --muted:#64748b; }
+    .page{ padding:16px; }
+    .ribbon{ background:linear-gradient(180deg,#6e0a0a,var(--brand)); color:#fff; border-radius:18px; padding:18px 24px; font-weight:900; margin-bottom:12px; overflow:hidden; }
+    .marquee { position: relative; width:100%; overflow:hidden; }
+    .marquee span { display:inline-block; padding-left:100%; white-space:nowrap; animation: scrollLeft 18s linear infinite; font-size:1.35rem; }
+    @keyframes scrollLeft { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
+    .row{ display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; }
+    .card{ background:#fff; border:1px solid var(--ring); border-radius:12px; box-shadow:0 8px 24px rgba(2,8,23,.06); }
+    .pick{ padding:12px 16px; }
+    .table{ width:100%; border-collapse:separate; border-spacing:0; }
+    .table th{ text-align:left; font-size:.82rem; color:var(--muted); border-bottom:1px solid var(--ring); padding:.55rem .7rem; }
+    .table td{ border-bottom:1px solid #f3f4f6; padding:.55rem .7rem; }
+    .btn{ border:1px solid var(--ring); background:#fff; border-radius:10px; padding:.45rem .75rem; font-weight:800; }
+    .btn-brand{ background:var(--brand); color:#fff; border-color:transparent; }
+    .field input{ border:1px solid var(--ring); border-radius:10px; padding:.5rem .7rem; }
+    /* Simple modal */
+    .modal{position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.35); z-index:60}
+    .modal.show{display:flex}
+    .sheet{width:min(520px,95vw); background:#fff; border:1px solid var(--ring); border-radius:16px; box-shadow:0 20px 60px rgba(2,8,23,.2); overflow:hidden}
+    .sheet .hd{display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid var(--ring); font-weight:900}
+    .sheet .bd{padding:16px}
+    .actions{display:flex; justify-content:flex-end; gap:.6rem; padding:0 16px 16px}
+  </style>
+{% endblock %}
+
+{% block content %}
+  <div class="page">
+    <form style="display:none">{% csrf_token %}</form>
+    <div class="ribbon"><div class="marquee"><span id="ribbonText">ECAGES</span></div></div>
+
+    <div class="card pick">
+      <div class="row" style="justify-content:space-between">
+        <div class="title" style="font-weight:900;">Commande (articles proposés)</div>
+        <div class="row">
+          <button id="btnSave" class="btn">Enregistrer</button>
+          <button id="btnSend" class="btn btn-brand">Envoyer à l'entrepôt</button>
+        </div>
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <div class="field" style="flex:1; min-width:260px;">
+          <input id="q" class="input" placeholder="Rechercher et ajouter (nom, marque)…" style="min-width:300px;">
+        </div>
+        <div><button id="btnAddSearch" class="btn">Ajouter</button></div>
+      </div>
+      <div class="row" style="gap:.4rem; margin-top:8px;">
+        <span class="muted" style="font-size:.85rem;">Afficher</span>
+        <select id="pgSize" class="btn" style="padding:.35rem .55rem;">
+          <option value="50" selected>50</option>
+          <option value="100">100</option>
+        </select>
+        <span class="muted" style="font-size:.85rem;">lignes</span>
+      </div>
+      <div style="margin-top:10px; overflow:auto;">
+        <table class="table">
+          <thead><tr><th>Produit</th><th>Marque</th><th>Disponible</th><th>—</th></tr></thead>
+          <tbody id="lines">
+            {% for it in draft_lines %}
+            <tr data-pid="{{ it.product_id }}">
+              <td><strong>{{ it.name }}</strong></td>
+              <td>{{ it.brand }}</td>
+              <td>{{ it.available }}</td>
+              <td><button class="btn btn-del">Suppr.</button></td>
+            </tr>
+            {% endfor %}
+            {% for s in suggestions %}
+            <tr data-pid="{{ s.product_id }}">
+              <td><strong>{{ s.name }}</strong></td>
+              <td>{{ s.brand }}</td>
+              <td>{{ s.available }}</td>
+              <td><button class="btn btn-del">Suppr.</button></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="muted">Aucun article proposé automatiquement.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="row" style="justify-content:flex-end; margin-top:8px;">
+        <div class="row" style="gap:.4rem;">
+          <span class="muted" style="font-size:.85rem;">Page</span>
+          <span id="pgCur">1</span>
+          <span class="muted" style="font-size:.85rem;">/</span>
+          <span id="pgTot">1</span>
+          <button id="pgPrev" class="btn">Précédent</button>
+          <button id="pgNext" class="btn">Suivant</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm send modal -->
+  <div id="confirmSend" class="modal" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="sheet">
+      <div class="hd">Confirmer l'envoi</div>
+      <div class="bd">Voulez‑vous envoyer cette commande à l'entrepôt maintenant ?</div>
+      <div class="actions">
+        <button id="sendCancel" class="btn">Annuler</button>
+        <button id="sendConfirm" class="btn btn-brand">Envoyer</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function(){
+    const $=s=>document.querySelector(s);
+    function getCSRF(){ const m=document.cookie.match('(^|;)\\s*csrftoken\\s*=\\s*([^;]+)'); if(m) return m.pop(); const el=document.querySelector('input[name="csrfmiddlewaretoken"]'); return el? el.value : ''; }
+    function ensureCsrfCookie(){
+      const m=document.cookie.match('(^|;)\\s*csrftoken\\s*=\\s*([^;]+)');
+      if(!m){
+        const el=document.querySelector('input[name="csrfmiddlewaretoken"]');
+        if(el && el.value){ document.cookie = `csrftoken=${el.value}; path=/`; }
+      }
+    }
+    const CSRF=getCSRF();
+    ensureCsrfCookie();
+    const linesBody=document.getElementById('lines');
+    const toast=(msg,kind='info')=>{ const d=document.createElement('div'); d.className='toast '+(kind==='good'?'good':kind==='bad'?'bad':''); d.textContent=msg; document.getElementById('toasts').appendChild(d); setTimeout(()=>d.remove(),3500); };
+    // Pagination state
+    let pgSize = Number(document.getElementById('pgSize')?.value || 50); let pgPage = 1; let cachedRows = [];
+    function collectRows(){ cachedRows = Array.from(linesBody.querySelectorAll('tr')); }
+    function renderPage(){
+      if(!cachedRows.length) collectRows();
+      const total = cachedRows.length; const pages = Math.max(1, Math.ceil(total / pgSize));
+      if(pgPage > pages) pgPage = pages; if(pgPage < 1) pgPage = 1;
+      cachedRows.forEach(tr=>tr.style.display='none');
+      const start = (pgPage - 1) * pgSize; const end = start + pgSize;
+      cachedRows.slice(start, end).forEach(tr=>tr.style.display='');
+      const curEl=document.getElementById('pgCur'); const totEl=document.getElementById('pgTot');
+      if(curEl) curEl.textContent = String(pgPage);
+      if(totEl) totEl.textContent = String(pages);
+      const prev=document.getElementById('pgPrev'); const next=document.getElementById('pgNext');
+      if(prev) prev.disabled = pgPage <= 1;
+      if(next) next.disabled = pgPage >= pages;
+    }
+    function refreshPager(){ collectRows(); renderPage(); }
+
+    // Marquee clock
+    (function(){ const el=document.getElementById('ribbonText'); if(!el) return; function pad(n){return n<10?'0'+n:n;} function cap(s){return s? s.charAt(0).toUpperCase()+s.slice(1):s;} function tick(){ const d=new Date(); const dateStr=cap(d.toLocaleDateString('fr-FR',{weekday:'long',year:'numeric',month:'long',day:'numeric'})); const timeStr=`${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; el.textContent=`ECAGES • {{ salespoint.name|default:"—" }} • ${dateStr} — ${timeStr}`; } tick(); setInterval(tick,1000); })();
+
+    linesBody?.addEventListener('click', (e)=>{
+      const btn=e.target.closest('.btn-del'); if(!btn) return; e.preventDefault(); const tr=btn.closest('tr'); if(tr) tr.remove();
+      refreshPager();
+    });
+
+    async function saveOrSend(action){
+      try{
+        const rows=[...document.querySelectorAll('#lines tr')].map(tr=>({ product_id:Number(tr.dataset.pid||0), qty:1 })).filter(x=>x.product_id>0);
+        if(rows.length===0){ toast('Ajoutez au moins un article.', 'bad'); return; }
+        const r=await fetch('',{ method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':CSRF,'X-Requested-With':'XMLHttpRequest'}, credentials:'same-origin', body:JSON.stringify({ action, lines:rows }) });
+        // Try to parse JSON only on OK; otherwise show generic error
+        if(!r.ok){ toast(`Erreur réseau/CSRF (${r.status}). Réessayez.`, 'bad'); return; }
+        const res=await r.json(); if(res.ok){
+          if(action==='send'){
+            if(Array.isArray(res.duplicates_removed) && res.duplicates_removed.length){
+              const list = res.duplicates_removed.map(x=>`• ${x.name} × ${x.qty}`).join('\n');
+              alert('Certains produits ont été ignorés car déjà en attente d\'approvisionnement:\n\n'+list+'\n\nLa demande restante a été envoyée.');
+            }
+            toast('Demande envoyée à l\'entrepôt.','good');
+            setTimeout(()=>{ location.href='{% url "sales:manager_dashboard" %}'; }, 900);
+          } else {
+            toast('Brouillon enregistré.','good');
+          }
+        } else {
+          if(res.code==='all_duplicates' && Array.isArray(res.duplicates_removed) && res.duplicates_removed.length){
+            const list = res.duplicates_removed.map(x=>`• ${x.name} × ${x.qty}`).join('\n');
+            alert('Tous les produits sont déjà en attente d\'approvisionnement:\n\n'+list+'\n\nVeuillez ajouter de nouveaux produits.');
+          }
+          toast(res.error||'Erreur.','bad');
+        }
+      }catch(e){
+        toast('Erreur réseau.','bad');
+      }
+    }
+    // Fancy confirm modal for sending
+    const m=document.getElementById('confirmSend');
+    const openModal=()=>{ if(m) m.classList.add('show'); };
+    const closeModal=()=>{ if(m) m.classList.remove('show'); };
+    document.getElementById('btnSave')?.addEventListener('click',()=>saveOrSend('save'));
+    document.getElementById('btnSend')?.addEventListener('click',(e)=>{ e.preventDefault(); openModal(); });
+    document.getElementById('sendCancel')?.addEventListener('click', (e)=>{ e.preventDefault(); closeModal(); });
+    document.getElementById('sendConfirm')?.addEventListener('click', async (e)=>{ e.preventDefault(); closeModal(); await saveOrSend('send'); });
+    document.addEventListener('keydown',(e)=>{ if(e.key==='Escape') closeModal(); });
+
+    // Button triggers API-backed suggest list add for current input
+    document.getElementById('btnAddSearch')?.addEventListener('click',(e)=>{ e.preventDefault(); const box=document.getElementById('sug'); if(box && box.firstChild){ box.firstChild.click(); } });
+    // API search suggest (not on list / not necessarily under alert)
+    async function searchAndSuggest(){
+      const q=document.getElementById('q').value.trim();
+      if(!q){ renderSuggest([]); return; }
+      try{
+        const r=await fetch(`{% url 'sales:manager_restock_search' %}?q=${encodeURIComponent(q)}`);
+        const data=await r.json();
+        renderSuggest(data||[]);
+      }catch{ renderSuggest([]); }
+    }
+    function renderSuggest(items){
+      let box=document.getElementById('sug');
+      if(!box){ box=document.createElement('div'); box.id='sug'; box.style.border='1px solid var(--ring)'; box.style.background='#fff'; box.style.borderRadius='10px'; box.style.position='absolute'; box.style.zIndex='20'; box.style.marginTop='6px'; box.style.maxHeight='280px'; box.style.overflow='auto'; document.querySelector('.field')?.appendChild(box); }
+      box.innerHTML='';
+      if(!items.length){ box.style.display='none'; return; }
+      items.forEach(it=>{ const row=document.createElement('div'); row.style.padding='.45rem .6rem'; row.style.cursor='pointer'; row.textContent=`${it.name}${it.brand? ' — '+it.brand:''} (dispo: ${it.available})`; row.addEventListener('click',()=>{ const tr=document.createElement('tr'); tr.dataset.pid=String(it.product_id); tr.innerHTML=`<td><strong>${it.name}</strong></td><td>${it.brand||''}</td><td>${it.available}</td><td><button class='btn btn-del'>Suppr.</button></td>`; linesBody.appendChild(tr); refreshPager(); box.style.display='none'; document.getElementById('q').value=''; }); box.appendChild(row); });
+      box.style.display='block';
+    }
+    document.getElementById('q')?.addEventListener('input',()=>{ clearTimeout(window.__sugT); window.__sugT=setTimeout(searchAndSuggest,180); });
+    document.addEventListener('click',(e)=>{ const box=document.getElementById('sug'); if(!box) return; if(!box.contains(e.target) && e.target.id!=='q'){ box.style.display='none'; }});
+
+    // Pager wiring
+    document.getElementById('pgPrev')?.addEventListener('click',()=>{ pgPage = Math.max(1, pgPage-1); renderPage(); });
+    document.getElementById('pgNext')?.addEventListener('click',()=>{ pgPage = pgPage+1; renderPage(); });
+    document.getElementById('pgSize')?.addEventListener('change',()=>{ const v=Number(document.getElementById('pgSize').value||100); pgSize = (v===50?50:100); pgPage = 1; renderPage(); });
+
+    // Initial render
+    refreshPager();
+  })();
+  </script>
+{% endblock %}
+

@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-[1200px] mx-auto px-4 py-6">
+  <!-- header -->
+  <div class="flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="text-2xl font-extrabold text-brand-600">Menu de Vente</div>
+      {% if salespoint %}
+        <div class="text-sm text-slate-500">Point de Vente: <span class="font-semibold">{{ salespoint.name }}</span></div>
+      {% endif %}
+    </div>
+    <div class="flex gap-2">
+      <a href="#" id="btnSellPiece" class="px-4 py-2 rounded-lg bg-brand-600 text-white font-semibold hover:bg-brand-500">Vente de Pièces</a>
+      <a href="#" id="btnSellMoto" class="px-4 py-2 rounded-lg bg-slate-800 text-white font-semibold hover:bg-slate-700">Vente de Motos</a>
+      <a href="#" id="btnCancel" class="px-4 py-2 rounded-lg bg-red-500 text-white font-semibold hover:bg-red-600">Demande d’Annulation</a>
+    </div>
+  </div>
+
+  {% if msg %}
+    <div class="mt-6 rounded-xl border border-amber-200 bg-amber-50 text-amber-800 px-4 py-3">{{ msg }}</div>
+  {% else %}
+
+  <!-- tabs -->
+  <div class="mt-6 rounded-2xl bg-white/80 backdrop-blur-xl border border-slate-100 shadow-glass">
+    <div class="border-b border-slate-200 px-4 pt-4">
+      <nav class="flex gap-2" aria-label="Tabs">
+        <button class="tab-btn px-4 py-2 rounded-t-lg bg-brand-600 text-white font-semibold" data-target="#tabPieces">Liste des Pièces</button>
+        <button class="tab-btn px-4 py-2 rounded-t-lg text-slate-700 hover:text-brand-600" data-target="#tabMotos">Liste des Motos</button>
+      </nav>
+    </div>
+
+    <!-- TABLES -->
+    <div class="p-4">
+      <!-- Pieces -->
+      <div id="tabPieces">
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-sm border-separate border-spacing-y-2">
+            <thead class="text-slate-600">
+              <tr>
+                <th class="text-left px-3 py-2">Produits</th>
+                <th class="text-left px-3 py-2">Prix de Vente</th>
+                <th class="text-left px-3 py-2">Marque</th>
+                <th class="text-left px-3 py-2">Qté initiale</th>
+                <th class="text-left px-3 py-2">Qté Vendue</th>
+                <th class="text-left px-3 py-2">Qté Disponible</th>
+                <th class="text-left px-3 py-2">Transf. Sortant</th>
+                <th class="text-left px-3 py-2">Transf. Entrant</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in pieces %}
+              <tr class="bg-white hover:bg-slate-50 border border-slate-100">
+                <td class="px-3 py-2 font-medium">{{ r.name }}</td>
+                <td class="px-3 py-2">{{ r.retail_price }}</td>
+                <td class="px-3 py-2">{{ r.brand }}</td>
+                <td class="px-3 py-2">{{ r.opening_qty }}</td>
+                <td class="px-3 py-2">{{ r.sold_qty }}</td>
+                <td class="px-3 py-2">{{ r.remaining_qty }}</td>
+                <td class="px-3 py-2">{{ r.transfer_out }}</td>
+                <td class="px-3 py-2">{{ r.transfer_in }}</td>
+              </tr>
+              {% empty %}
+              <tr><td class="px-3 py-4 text-slate-500" colspan="8">Aucune pièce.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Motos -->
+      <div id="tabMotos" class="hidden">
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-sm border-separate border-spacing-y-2">
+            <thead class="text-slate-600">
+              <tr>
+                <th class="text-left px-3 py-2">Produits</th>
+                <th class="text-left px-3 py-2">Prix de Vente</th>
+                <th class="text-left px-3 py-2">Marque</th>
+                <th class="text-left px-3 py-2">Qté initiale</th>
+                <th class="text-left px-3 py-2">Qté Vendue</th>
+                <th class="text-left px-3 py-2">Qté Disponible</th>
+                <th class="text-left px-3 py-2">Transf. Sortant</th>
+                <th class="text-left px-3 py-2">Transf. Entrant</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in motos %}
+              <tr class="bg-white hover:bg-slate-50 border border-slate-100">
+                <td class="px-3 py-2 font-medium">{{ r.name }}</td>
+                <td class="px-3 py-2">{{ r.retail_price }}</td>
+                <td class="px-3 py-2">{{ r.brand }}</td>
+                <td class="px-3 py-2">{{ r.opening_qty }}</td>
+                <td class="px-3 py-2">{{ r.sold_qty }}</td>
+                <td class="px-3 py-2">{{ r.remaining_qty }}</td>
+                <td class="px-3 py-2">{{ r.transfer_out }}</td>
+                <td class="px-3 py-2">{{ r.transfer_in }}</td>
+              </tr>
+              {% empty %}
+              <tr><td class="px-3 py-4 text-slate-500" colspan="8">Aucune moto.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Tabs + (placeholder) open modals -->
+<script>
+(function(){
+  const tabs = document.querySelectorAll(".tab-btn");
+  function show(target){
+    document.querySelectorAll("#tabPieces, #tabMotos").forEach(el=>el.classList.add("hidden"));
+    const t = document.querySelector(target); if(t) t.classList.remove("hidden");
+    tabs.forEach(b=>b.classList.remove("bg-brand-600","text-white"));
+    const btn = Array.from(tabs).find(b=>b.dataset.target===target);
+    if(btn){ btn.classList.add("bg-brand-600","text-white"); }
+  }
+  tabs.forEach(b=>b.addEventListener("click", ()=>show(b.dataset.target)));
+  // default
+  show("#tabPieces");
+
+  // buttons → à brancher avec tes modaux
+  document.getElementById("btnSellPiece")?.addEventListener("click", e=>{ e.preventDefault(); /* open modal Vente de Pièces */ });
+  document.getElementById("btnSellMoto")?.addEventListener("click",  e=>{ e.preventDefault(); /* open modal Vente de Motos */ });
+  document.getElementById("btnCancel")?.addEventListener("click",    e=>{ e.preventDefault(); /* open modal Demande d’Annulation */ });
+})();
+</script>
+{% endblock %}

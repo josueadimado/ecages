@@ -1,0 +1,112 @@
+{% extends "layouts/base_sales.html" %}
+{% block title %}Statistiques de ravitaillement{% endblock %}
+{% block extra_css %}
+<style>
+  .kp-card{background:#fff;border:1px solid var(--ring);border-radius:14px;box-shadow:var(--shadow)}
+  .kp-title{font-weight:900;font-size:1.1rem}
+  .btn{border:1px solid var(--ring);border-radius:10px;background:#fff;padding:.5rem .8rem;font-weight:800;color:#1f2937}
+  .btn:hover{box-shadow:0 6px 16px rgba(0,0,0,.08)}
+  .kp-table{width:100%;border-collapse:separate;border-spacing:0}
+  .kp-table thead th{position:sticky;top:0;background:#fff;z-index:1;text-align:left;font-size:.8rem;color:#64748b;border-bottom:1px solid var(--ring);padding:.6rem .75rem}
+  .kp-table tbody td{border-bottom:1px solid #f2f4f7;padding:.6rem .75rem}
+  .muted{color:#64748b}
+</style>
+{% endblock %}
+{% block content %}
+<div class="page">
+  <div class="ribbon"><div class="marquee"><span id="ribbonText">ECAGES • Statistiques de ravitaillement</span></div></div>
+
+  <div class="kp-card" style="margin-bottom:12px;padding:12px 16px;">
+    <form method="get" class="kp-toolbar" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <div class="kp-title" style="margin-right:auto;">Statistiques de ravitaillement</div>
+      <select class="btn" name="sp">
+        <option value="0">Tous les points de vente</option>
+        {% for sp in salespoints %}
+          <option value="{{ sp.id }}" {% if sp_id == sp.id %}selected{% endif %}>{{ sp.name }}</option>
+        {% endfor %}
+      </select>
+      <input class="btn" name="product" value="{{ product_q }}" placeholder="Produit ou marque..." />
+      <input class="btn" type="date" name="from" value="{{ date_from }}" placeholder="Du" />
+      <input class="btn" type="date" name="to" value="{{ date_to }}" placeholder="Au" />
+      <button class="btn" type="submit">Filtrer</button>
+      <a class="btn" href="?">Aujourd'hui</a>
+      <a class="btn" id="exportCsv" href="#">Exporter CSV</a>
+    </form>
+    <div class="muted" style="margin-top:8px;font-weight:800">
+      Total Qté: {{ total_qty }}
+      {% if date_from == date_to and date_from %}
+        • Période: {{ date_from|date:"d/m/Y" }}
+      {% elif date_from and date_to %}
+        • Période: {{ date_from|date:"d/m/Y" }} - {{ date_to|date:"d/m/Y" }}
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="kp-card" style="padding:0;overflow:auto;">
+    <table class="kp-table" style="min-width:960px">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Produit</th>
+          <th>Marque</th>
+          <th>Qté</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td class="muted">{{ r.date|date:"d/m/Y" }}</td>
+          <td style="font-weight:800">{{ r.name }}</td>
+          <td>{{ r.brand|default:"—" }}</td>
+          <td>{{ r.qty }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" style="padding:12px;color:#64748b;font-weight:800">Aucun ravitaillement trouvé.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if paginator %}
+  <div class="pagination" style="display:flex;justify-content:center;align-items:center;gap:8px;margin:14px 0;">
+    {% if page.has_previous %}
+      <a class="btn" href="?page=1">« Première</a>
+      <a class="btn" href="?page={{ page.previous_page_number }}">‹ Précédente</a>
+    {% else %}
+      <span class="btn" style="opacity:.5;pointer-events:none;">« Première</span>
+      <span class="btn" style="opacity:.5;pointer-events:none;">‹ Précédente</span>
+    {% endif %}
+    <span class="btn" style="background:var(--brand);color:#fff;border-color:var(--brand)">Page {{ page.number }} / {{ paginator.num_pages }}</span>
+    {% if page.has_next %}
+      <a class="btn" href="?page={{ page.next_page_number }}">Suivante ›</a>
+      <a class="btn" href="?page={{ paginator.num_pages }}">Dernière »</a>
+    {% else %}
+      <span class="btn" style="opacity:.5;pointer-events:none;">Suivante ›</span>
+      <span class="btn" style="opacity:.5;pointer-events:none;">Dernière »</span>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  // Marquee clock
+  var el = document.getElementById('ribbonText');
+  function pad(n){return n<10?'0'+n:n}
+  function cap(s){return s? s.charAt(0).toUpperCase()+s.slice(1):s;}
+  var dateStr = cap((new Date()).toLocaleDateString('fr-FR', {weekday:'long', year:'numeric', month:'long', day:'numeric'}));
+  function tick(){ var d=new Date(); var timeStr=pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds()); if(el){ el.textContent='ECAGES • MAGASIN (DIRECTION GENERALE) • '+dateStr+' — '+timeStr; } }
+  tick(); setInterval(tick, 1000);
+
+  // Export link
+  const exportBtn = document.getElementById('exportCsv');
+  if (exportBtn) {
+    const params = new URLSearchParams(window.location.search);
+    exportBtn.href = '{% url "inventory:restock_stats_export_csv" %}?'+params.toString();
+  }
+});
+</script>
+{% endblock %}
+

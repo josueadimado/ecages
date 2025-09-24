@@ -1,0 +1,1 @@
+   import BaseSale from 'path/to/base_sale';

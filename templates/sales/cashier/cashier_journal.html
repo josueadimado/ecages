@@ -1,0 +1,336 @@
+{% extends "layouts/base_cashier.html" %}
+
+{% block title %}Journal — Caisse | ECAGES{% endblock %}
+{% block nav_journal_active %}active{% endblock %}
+
+{% block extra_css %}
+  /* inherit brand from base; page-specific tokens */
+  :root {
+    --ink: #0f172a;
+    --muted: #64748b;
+    --ring: #e5e7eb;
+    --bg: #f8fafc;
+    --card: #ffffff;
+    --shadow: 0 10px 30px rgba(2, 8, 23, .06);
+  }
+  html, body { background: var(--bg); }
+  html, body { height: 100%; }
+  .page { min-height: 100vh; }
+  .page { max-width: none; width: 100%; margin: 0; padding: 18px 16px 28px; }
+
+  /* Top controls/header (consistent with dashboard) */
+  .controls-card{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; background:#fff; border:1px solid var(--ring); border-radius:14px; padding:12px 14px; box-shadow:0 1px 4px rgba(0,0,0,.04); margin-bottom:14px; }
+  .controls-title{ font-weight:900; color:var(--ink); }
+  .controls-actions{ margin-left:auto; display:flex; gap:8px; }
+  .btn{ border:1px solid var(--ring); background:#fff; border-radius:10px; padding:.5rem .75rem; font-weight:800; cursor:pointer; transition: box-shadow .15s, background .15s, transform .02s; }
+  .btn:hover{ background:#fafafa; box-shadow:0 4px 18px rgba(2,8,23,.06); }
+  .btn:active{ transform: scale(.998); }
+  .btn-primary{ background: var(--brand, #580706); color:#fff; border-color: var(--brand, #580706); }
+  .btn.disabled{ opacity:.55; pointer-events:none; filter:grayscale(10%); }
+
+  /* Filters */
+  .card { background: var(--card); border:1px solid var(--ring); border-radius:12px; box-shadow: var(--shadow); }
+  .card { width: 100%; }
+  .filters { display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:12px 16px; }
+  .filters input, .filters select { border:1px solid var(--ring); border-radius:12px; padding:.56rem .8rem; font-weight:800; background:#f9fafb; color:var(--ink); }
+  .filters input[type="date"]{ min-width: 170px; }
+  .filters select[name="status"]{ min-width: 200px; }
+  .filters .submit { background: var(--brand, #580706); color:#fff; border-color: var(--brand, #580706); border-radius:12px; }
+  .filters .ghost { background:#fff; color:var(--ink); }
+  .filters .ghost:hover{ background:#fafafa; }
+  .filters .spacer{ flex:1; }
+  .title { font-weight: 900; color: var(--ink); }
+  .muted { color: var(--muted); }
+
+  /* Table */
+  .wraptbl { background:#fff; border:1px solid var(--ring); border-radius:12px; box-shadow: var(--shadow); overflow:auto; height: calc(100vh - 260px); min-height: 320px; }
+  table.table{width:100%; border-collapse:separate; border-spacing:0; font-size:.98rem; min-width:840px;}
+  table.table th{position:sticky; top:0; background: rgba(88,7,6,.035); z-index:1; text-align:left; font-size:.85rem; color:#64748b; border-bottom:1px solid #e5e7eb; padding:.7rem .9rem; font-weight:900; letter-spacing:.1px;}
+  table.table td{border-bottom:1px solid #f2f4f7; padding:.75rem .9rem;}
+  table.table tr:hover td{background:#f6f7fb;}
+  td.right{text-align:right;}
+
+  /* Badges */
+  .badge{display:inline-block; padding:.25rem .6rem; border-radius:999px; font-weight:800; font-size:.78rem; border:1px solid #e5e7eb;}
+  .b-await{background:#fff7ed; color:#b45309;}
+  .b-approved{background:#ecfdf5; color:#047857;}
+  .b-rejected{background:#fef2f2; color:#b91c1c;}
+  .b-cancelled{background:#eef2ff; color:#4338ca;}
+  .b-draft{background:#f3f4f6; color:#111827;}
+
+  /* Modal */
+  .modal{position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(15,23,42,.25); z-index:100;}
+  .modal.show{display:flex;}
+  .sheet{width:min(900px,95vw); background:#fff; border-radius:16px; border:1px solid var(--ring); box-shadow:0 30px 60px rgba(2,8,23,.2); overflow:hidden;}
+  .sheet .hd{display:flex; align-items:center; justify-content:space-between; padding:14px 16px; background: linear-gradient(135deg, #fff, #fafafa); border-bottom:1px solid var(--ring);}
+  .sheet .bd{padding:16px;}
+  .grid-2{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+  .info-card{border:1px solid var(--ring); border-radius:12px; padding:.7rem .9rem;}
+  .amount-big{font-size:1.8rem; font-weight:900; color:var(--ink);}
+  .pill{display:inline-flex; align-items:center; gap:6px; padding:.25rem .6rem; border-radius:999px; font-weight:800; font-size:.78rem;}
+  .pill-await{background:#fff7ed; color:#b45309;}
+  .pill-approved{background:#ecfdf5; color:#047857;}
+  .pill-rejected{background:#fef2f2; color:#b91c1c;}
+  .pill-cancelled{background:#eef2ff; color:#4338ca;}
+  .pill-draft{background:#f3f4f6; color:#111827;}
+
+  /* Empty state */
+  .empty { color: var(--muted); }
+  td.empty { text-align: center; padding: 1.25rem .9rem; font-weight: 700; }
+  .wraptbl table.table td.empty { width: 100%; }
+
+  @media (max-width: 900px){ .grid-2{grid-template-columns:1fr;} .page{padding:12px 8px 22px;} }
+{% endblock %}
+
+{% block content %}
+  {% now "Y-m-d" as today_str %}
+
+  <div class="page">
+    <!-- HEADER / minimal -->
+    <div class="controls-card" role="region" aria-label="En-tête du journal">
+      <div class="controls-title"><span id="marqText">Journal · {{ request.user.salespoint.name|default:"—" }}</span></div>
+      <div class="controls-actions">
+        {% url 'sales:cashier_dashboard' as default_back %}
+        <a href="{{ back_url|default:default_back }}" class="btn" title="Retour">⟵ Retour</a>
+      </div>
+    </div>
+
+    <!-- FILTERS + TOTALS -->
+    <div class="card" style="margin-bottom:14px;">
+      <form class="filters" method="get" data-show-loader>
+        <div class="title" style="margin-right:8px;">Filtrer</div>
+        <input type="text" name="q" value="{{ q }}" placeholder="Recherche (client, vendeur, numéro)…" />
+        <select name="status">
+          <option value="">Tous statuts</option>
+          <option value="draft" {% if status == "draft" %}selected{% endif %}>Brouillon</option>
+          <option value="awaiting_cashier" {% if status == "awaiting_cashier" %}selected{% endif %}>En attente de caisse</option>
+          <option value="approved" {% if status == "approved" %}selected{% endif %}>Validée</option>
+          <option value="rejected" {% if status == "rejected" %}selected{% endif %}>Rejetée</option>
+          <option value="cancelled" {% if status == "cancelled" %}selected{% endif %}>Annulée</option>
+        </select>
+        <input type="date" name="from" id="f-from" value="{{ date_from|default:today_str }}">
+        <input type="date" name="to" id="f-to" value="{{ date_to|default:today_str }}">
+        <select name="per" title="Par page">
+          <option value="25" {% if per == 25 %}selected{% endif %}>25 / page</option>
+          <option value="50" {% if per == 50 %}selected{% endif %}>50 / page</option>
+          <option value="100" {% if per == 100 %}selected{% endif %}>100 / page</option>
+        </select>
+        <button class="btn submit" type="submit">Appliquer</button>
+        <div class="spacer"></div>
+        <div class="muted" style="font-weight:800;">Résultats: <strong>{{ totals.count|default:0 }}</strong></div>
+        <button type="button" id="btnToday" class="btn ghost" title="Aujourd'hui">Aujourd'hui</button>
+      </form>
+    </div>
+
+    <!-- TABLE -->
+    <div class="wraptbl">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Client</th>
+            <th>Vendeur</th>
+            <th>Montant</th>
+            <th>Statut</th>
+            <th>Date</th>
+            <th class="right">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in rows %}
+            <tr data-sale-id="{{ s.id }}"
+                data-number="{{ s.number }}"
+                data-customer="{{ s.customer_name }}"
+                data-phone="{{ s.customer_phone|default_if_none:'' }}"
+                data-seller="{{ s.seller.get_full_name|default:s.seller.username }}"
+                data-amount="{{ s.total_amount|default_if_none:0|floatformat:0 }}"
+                data-status="{{ s.status }}"
+                data-created="{{ s.created_at|date:"d/m/Y H:i" }}"
+                data-lines='[{% for it in s.items.all %}{"n":"{{ it.product.name|escapejs }}","q":{{ it.quantity }},"u":{{ it.unit_price|floatformat:0 }},"t":{{ it.line_total|floatformat:0 }}}{% if not forloop.last %},{% endif %}{% endfor %}]'>
+              <td><strong>{{ s.number }}</strong></td>
+              <td>{{ s.customer_name }}</td>
+              <td>{{ s.seller.get_full_name|default:s.seller.username }}</td>
+              <td><strong>{{ s.total_amount|floatformat:0 }}</strong></td>
+              <td>
+                {% if s.status == 'draft' %}<span class="badge b-draft">Brouillon</span>
+                {% elif s.status == 'awaiting_cashier' %}<span class="badge b-await">En attente</span>
+                {% elif s.status == 'approved' %}<span class="badge b-approved">Validée</span>
+                {% elif s.status == 'rejected' %}<span class="badge b-rejected">Rejetée</span>
+                {% elif s.status == 'cancelled' %}<span class="badge b-cancelled">Annulée</span>
+                {% else %}{{ s.status }}{% endif %}
+              </td>
+              <td>{{ s.created_at|date:"d/m/Y H:i" }}</td>
+              <td class="right"><button class="btn btn-detail">Détails</button></td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="7" class="empty">Aucune vente.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if page_obj and paginator %}
+    <div class="card" style="margin-top:10px; padding:10px 12px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+      <div class="muted">Page {{ page_obj.number }} / {{ paginator.num_pages }}</div>
+      <div style="margin-left:auto; display:flex; gap:6px;">
+        {% if page_obj.has_previous %}
+          <a class="btn" href="?page=1{% if base_qs %}&{{ base_qs }}{% endif %}">« Première</a>
+          <a class="btn" href="?page={{ page_obj.previous_page_number }}{% if base_qs %}&{{ base_qs }}{% endif %}">‹ Précédente</a>
+        {% else %}
+          <span class="btn disabled">« Première</span>
+          <span class="btn disabled">‹ Précédente</span>
+        {% endif %}
+        {% if page_obj.has_next %}
+          <a class="btn" href="?page={{ page_obj.next_page_number }}{% if base_qs %}&{{ base_qs }}{% endif %}">Suivante ›</a>
+          <a class="btn" href="?page={{ paginator.num_pages }}{% if base_qs %}&{{ base_qs }}{% endif %}">Dernière »</a>
+        {% else %}
+          <span class="btn disabled">Suivante ›</span>
+          <span class="btn disabled">Dernière »</span>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- MODAL: detail -->
+  <div id="modalDetail" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalDetailTitle" tabindex="-1">
+    <div class="sheet">
+      <div class="hd">
+        <div class="title" id="modalDetailTitle">Détail de la vente</div>
+        <button class="btn" data-close="#modalDetail">Fermer ✕</button>
+      </div>
+      <div class="bd">
+        <div class="grid-2" style="margin:.25rem 0 1rem 0; align-items:flex-start;">
+          <div class="info-card">
+            <div class="muted">Facture</div>
+            <div class="title" id="d-number">—</div>
+            <div class="muted" id="d-created" style="margin-top:.35rem;">—</div>
+          </div>
+          <div class="info-card" style="text-align:right;">
+            <div class="muted">Montant</div>
+            <div class="amount-big" id="d-amount">—</div>
+            <div style="margin-top:.35rem;"><span id="d-status-pill" class="pill pill-draft">Brouillon</span></div>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="info-card">
+            <div class="muted">Client</div>
+            <div id="d-customer" style="font-weight:800">—</div>
+            <div id="d-phone" class="muted"><a id="d-phone-link" href="#" style="text-decoration:none; color:inherit;">—</a></div>
+          </div>
+          <div class="info-card">
+            <div class="muted">Vendeur</div>
+            <div id="d-seller" style="font-weight:800">—</div>
+          </div>
+        </div>
+        <div class="info-card" style="margin-top:12px;">
+          <div class="title" style="font-size:1rem;">Articles vendus</div>
+          <div style="max-height:340px; overflow:auto; margin-top:.5rem;">
+            <table class="table">
+              <thead><tr><th>Produit</th><th>Qté</th><th>Prix</th><th>Total</th></tr></thead>
+              <tbody id="d-items"></tbody>
+            </table>
+          </div>
+        </div>
+        <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:14px; flex-wrap:wrap;">
+          <a id="d-receipt" class="btn" target="_blank" rel="noopener" href="#" title="Disponible uniquement pour les ventes validées">Imprimer le reçu</a>
+          <button class="btn" data-close="#modalDetail">Fermer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function(){
+    const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
+
+    // Header label only (time handled by base marquee)
+    const marq=document.getElementById('marqText');
+    (function(){
+      const spName = "{{ request.user.salespoint.name|default:'—' }}";
+      if (marq) marq.textContent = `Journal · ${spName}`;
+    })();
+
+    // Aujourd'hui
+    const fFrom = document.getElementById('f-from');
+    const fTo   = document.getElementById('f-to');
+    const btnToday = document.getElementById('btnToday');
+    function todayStr(){ const d=new Date(),p=n=>n<10?'0'+n:n; return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`; }
+    if (btnToday && fFrom && fTo) { btnToday.addEventListener('click', ()=>{ const t=todayStr(); fFrom.value=t; fTo.value=t; fFrom.form && fFrom.form.submit(); }); }
+
+    // Modal
+    function openModal(id){ const m=$(id); if(!m) return; m.classList.add('show'); }
+    function closeModal(id){ const m=$(id); if(!m) return; m.classList.remove('show'); }
+    document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>closeModal(b.getAttribute('data-close'))));
+
+    // Close modal with ESC key and by clicking the overlay
+    const modalEl = document.getElementById('modalDetail');
+    document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeModal('#modalDetail'); });
+    if (modalEl) { modalEl.addEventListener('click', (e)=>{ if (e.target === modalEl) closeModal('#modalDetail'); }); }
+
+    // Bind details
+    $$('.btn-detail').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        const tr=btn.closest('tr');
+        const id=tr.dataset.saleId;
+        $('#d-number').textContent=tr.dataset.number;
+        $('#d-customer').textContent=tr.dataset.customer;
+        const phoneVal = tr.dataset.phone || '';
+        const phoneLink = document.getElementById('d-phone-link');
+        if (phoneVal) {
+          if (phoneLink) { phoneLink.textContent = phoneVal; phoneLink.setAttribute('href', `tel:${phoneVal}`); }
+        } else {
+          if (phoneLink) { phoneLink.textContent = '—'; phoneLink.setAttribute('href', '#'); }
+        }
+        $('#d-seller').textContent=tr.dataset.seller;
+        $('#d-amount').textContent=`FCFA ${Number(tr.dataset.amount||0).toLocaleString('fr-FR')}`;
+        $('#d-created').textContent=tr.dataset.created;
+
+        const st=tr.dataset.status;
+        const stTxt = st==='awaiting_cashier'?'En attente': st==='approved'?'Validée': st==='rejected'?'Rejetée': st==='cancelled'?'Annulée': 'Brouillon';
+        const pill = document.getElementById('d-status-pill');
+        pill.textContent = stTxt;
+        pill.className = 'pill ' + (
+          st==='awaiting_cashier' ? 'pill-await' :
+          st==='approved' ? 'pill-approved' :
+          st==='rejected' ? 'pill-rejected' :
+          st==='cancelled' ? 'pill-cancelled' :
+          'pill-draft'
+        );
+
+        // Enable/disable receipt link based on status
+        const receiptLink = document.getElementById('d-receipt');
+        const isApproved = (st === 'approved');
+        if (isApproved){
+          const url = '{% url "sales:sales_print_receipt" sale_id=0 %}'.replace(/0$/, id);
+          receiptLink.setAttribute('href', url);
+          receiptLink.classList.remove('disabled');
+          receiptLink.textContent = 'Imprimer le reçu';
+        } else {
+          receiptLink.setAttribute('href', '#');
+          receiptLink.classList.add('disabled');
+          receiptLink.textContent = 'Reçu indisponible';
+        }
+
+        // Items
+        const itemsTbody = document.getElementById('d-items'); itemsTbody.innerHTML='';
+        let lines = []; try { lines = JSON.parse(tr.getAttribute('data-lines') || '[]'); } catch(_) {}
+        if (!lines.length) {
+          const trEmpty=document.createElement('tr'); const td=document.createElement('td');
+          td.colSpan=4; td.className='muted'; td.textContent='Aucun article.'; trEmpty.appendChild(td); itemsTbody.appendChild(trEmpty);
+        } else {
+          lines.forEach(li=>{
+            const row=document.createElement('tr');
+            row.innerHTML = `<td><strong>${li.n}</strong></td><td>${li.q}</td><td>${Number(li.u||0).toLocaleString('fr-FR')}</td><td>${Number(li.t||0).toLocaleString('fr-FR')}</td>`;
+            itemsTbody.appendChild(row);
+          });
+        }
+
+
+        openModal('#modalDetail');
+      });
+    });
+  })();
+</script>
+{% endblock %}

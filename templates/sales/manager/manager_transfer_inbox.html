@@ -1,0 +1,88 @@
+{% extends "layouts/base_sales.html" %}
+{% block title %}Transferts à effectuer | ECAGES{% endblock %}
+{% block extra_css %}
+  <style>
+    :root{ --ring:#e5e7eb; --muted:#64748b; }
+    .page{ padding:16px; }
+    .ribbon{ background:linear-gradient(180deg,#6e0a0a,var(--brand)); color:#fff; border-radius:18px; padding:18px 24px; font-weight:900; margin-bottom:12px; overflow:hidden; }
+    .marquee{ position:relative; width:100%; overflow:hidden; }
+    .marquee span{ display:inline-block; padding-left:100%; white-space:nowrap; animation: scrollLeft 18s linear infinite; font-size:1.35rem; }
+    @keyframes scrollLeft { 0%{transform:translateX(0)} 100%{transform:translateX(-100%)} }
+    .card{ background:#fff; border:1px solid var(--ring); border-radius:12px; box-shadow:0 8px 24px rgba(2,8,23,.06); }
+    table.table{width:100%; border-collapse:separate; border-spacing:0; font-size:.98rem; min-width:840px;}
+    table.table th{position:sticky; top:0; background:#fafafa; text-align:left; font-size:.85rem; color:var(--muted); border-bottom:1px solid var(--ring); padding:.7rem .9rem; font-weight:900;}
+    table.table td{border-bottom:1px solid #f2f4f7; padding:.75rem .9rem;}
+    .badge{display:inline-block; padding:.22rem .55rem; border-radius:999px; font-weight:800; font-size:.78rem; border:1px solid var(--ring);}
+    .b-sent{background:#eef2ff; color:#3730a3}
+    .b-approved{background:#ecfdf5; color:#047857}
+    .b-rejected{background:#fef2f2; color:#b91c1c}
+    /* Modal & buttons */
+    .modal{position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(2,8,23,.35); z-index:60}
+    .sheet{width:min(760px,95vw); background:#fff; border:1px solid var(--ring); border-radius:16px; box-shadow:0 20px 60px rgba(2,8,23,.2); overflow:hidden}
+    .sheet .hd{display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:1px solid var(--ring); font-weight:900}
+    .sheet .sub{display:block; font-weight:700; font-size:.85rem; color:#64748b}
+    .sheet .bd{padding:16px}
+    .sheet .ft{display:flex; justify-content:flex-end; gap:.6rem; padding:0 16px 16px}
+    .btn{ border:1px solid var(--ring); background:#fff; border-radius:10px; padding:.45rem .75rem; font-weight:800; }
+    .btn-brand{ background:var(--brand); color:#fff; border-color:transparent; }
+    .btn-outline{ background:#fff; color:#374151; }
+  </style>
+{% endblock %}
+{% block content %}
+<div class="page">
+  <div class="ribbon"><div class="marquee"><span id="ribbonText">ECAGES</span></div></div>
+  <div class="card" style="overflow:auto;">
+    <table class="table">
+      <thead><tr><th>#</th><th>De</th><th>Date</th><th>Statut</th><th>Articles</th><th class="right">Action</th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>{{ r.number|default:"TR-"|add:r.id }}</td>
+          <td>{{ r.from_salespoint.name }}</td>
+          <td>{{ r.created_at|date:"d/m/Y H:i" }}</td>
+          <td>{% if r.status == 'sent' %}<span class="badge b-sent">Entrante (en attente)</span>{% elif r.status == 'approved' %}<span class="badge b-approved">Approuvée</span>{% elif r.status == 'rejected' %}<span class="badge b-rejected">Rejetée</span>{% else %}{{ r.status }}{% endif %}</td>
+          <td>{{ r.lines.count }}</td>
+          <td class="right"><button class="btn" data-view="{{ r.id }}">Voir</button></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" style="color:#64748b; padding:1rem .9rem; font-weight:700;">Aucune demande.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div id="trModal" class="modal">
+    <div class="sheet">
+      <div class="hd"> 
+        <div>
+          Demande <span id="trNo"></span>
+          <small id="trFromTo" class="sub"></small>
+        </div>
+        <button id="trClose" class="btn btn-outline" title="Fermer">✕</button>
+      </div>
+      <div class="bd" id="trBody"></div>
+      <div class="ft"><button id="trReject" class="btn btn-outline">Rejeter</button><button id="trApprove" class="btn btn-brand">Approuver</button></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function(){
+  const $=s=>document.querySelector(s);
+  const CSRF=(document.cookie.match('(^|;)\\s*csrftoken\\s*=\\s*([^;]+)')||[]).pop()||document.querySelector('input[name="csrfmiddlewaretoken"]').value||'';
+  (function(){ const el=document.getElementById('ribbonText'); if(!el) return; function pad(n){return n<10?'0'+n:n;} function cap(s){return s? s.charAt(0).toUpperCase()+s.slice(1):s;} function tick(){ const d=new Date(); const dateStr=cap(d.toLocaleDateString('fr-FR',{weekday:'long',year:'numeric',month:'long',day:'numeric'})); const timeStr=`${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; el.textContent=`ECAGES • {{ salespoint.name|default:"—" }} • ${dateStr} — ${timeStr}`; } tick(); setInterval(tick,1000); })();
+  const modal=$('#trModal'), body=$('#trBody'), no=$('#trNo');
+  function open(){ modal.style.display='flex'; }
+  function close(){ modal.style.display='none'; }
+  $('#trClose')?.addEventListener('click', close);
+  async function view(id){ const r=await fetch(`/sales/api/manager/transfer-request/${id}/lines/`); const res=await r.json(); if(!res.ok){ alert(res.error||'Erreur'); return; } no.textContent = res.number||`TR-${res.id}`; const ft=document.getElementById('trFromTo'); if(ft){ ft.textContent = `${res.from} → ${res.to}`; } let isDecided = (res.status && res.status!=='sent'); const hdrLabel = isDecided? 'Quantité approuvée' : 'À envoyer'; const rows=(res.lines||[]).map(li=>`<tr data-pid="${li.product_id}"><td><strong>${li.name}</strong></td><td>${li.brand||''}</td><td>${ isDecided ? `<strong>${li.qty}</strong>` : `<input type='number' min='0' max='${li.available_at_source}' value='${Math.min(li.qty||0, li.available_at_source)}' style='width:90px; border:1px solid var(--ring); border-radius:10px; padding:.3rem .5rem; font-weight:800;' />` }</td><td>${li.available_at_source}</td></tr>`).join(''); body.innerHTML=`<div style='max-height:360px; overflow:auto;'><table class='table'><thead><tr><th>Produit</th><th>Marque</th><th>${hdrLabel}</th><th>Dispo. source</th></tr></thead><tbody>${rows||'<tr><td colspan=4>Aucune ligne.</td></tr>'}</tbody></table></div>`; open(); const approveBtn=document.getElementById('trApprove'), rejectBtn=document.getElementById('trReject'); if(isDecided){ approveBtn.style.display='none'; rejectBtn.style.display='none'; } else { approveBtn.onclick=()=>decide(id,'approve'); rejectBtn.onclick=()=>decide(id,'reject'); } }
+  async function decide(id,decision){ try{ let lines=[]; if(decision==='approve'){ lines=[...document.querySelectorAll('#trBody tbody tr')].map(tr=>({product_id:Number(tr.dataset.pid), qty: Number(tr.querySelector('input')?.value||0)})); const anyQty = lines.some(x=>x.qty>0); if(!anyQty){ if(!confirm('Aucune quantité sélectionnée. Confirmez-vous l\'approbation sans transfert ?')) return; } } const r=await fetch(`/sales/api/manager/transfer-request/${id}/decide/`,{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':CSRF}, body: JSON.stringify({decision, lines})}); const res=await r.json(); if(res.ok){ location.reload(); } else { alert(res.error||'Erreur'); } }catch{ alert('Erreur réseau'); } }
+  // If opened with ?open=ID (from history), auto open the modal
+  const params=new URLSearchParams(location.search); const openId=params.get('open'); if(openId){ view(openId); }
+  document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>view(b.dataset.view)));
+})();
+</script>
+{% endblock %}
+
+

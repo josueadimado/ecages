@@ -1,0 +1,60 @@
+{% load text_extras %}
+<table class="products-table">
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Produit</th>
+      <th>Marque</th>
+      <th>Prix d'achat</th>
+      <th>Prix de gros</th>
+      <th>Prix de vente</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for product in products %}
+    <tr data-product-id="{{ product.id }}">
+      <td><span style="color:#64748b;font-weight:700">#{{ product.id }}</span></td>
+      <td>
+        <div style="font-weight: 700; color: #1e293b;">{{ product.name|fix_encoding }}</div>
+        <div style="font-size: 0.8rem; color: #64748b;">{{ product.sku|default:"—" }}</div>
+      </td>
+      <td>
+        {% if product.brand %}
+          <span class="brand-badge">{{ product.brand.name }}</span>
+        {% else %}
+          <span style="color: #94a3b8;">—</span>
+        {% endif %}
+      </td>
+      <td><span>{{ product.cost_price|floatformat:0 }}</span></td>
+      <td><span>{{ product.wholesale_price|floatformat:0 }}</span></td>
+      <td><span>{{ product.selling_price|floatformat:0 }}</span></td>
+      <td>
+        <button class="btn-secondary" onclick="openPriceModal({{ product.id }}, '{{ product.name|fix_encoding|escapejs }}', '{{ product.brand.name|default:''|escapejs }}', {{ product.cost_price|default:0 }}, {{ product.wholesale_price|default:0 }}, {{ product.selling_price|default:0 }})">
+          Mettre à jour
+        </button>
+      </td>
+    </tr>
+    {% empty %}
+    <tr>
+      <td colspan="6" style="text-align: center; padding: 40px; color: #64748b;">
+        Aucun produit trouvé.
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% if products.has_other_pages %}
+<div class="pagination">
+  {% if products.has_previous %}
+    <a href="?page=1">« Première</a>
+    <a href="?page={{ products.previous_page_number }}">‹ Précédente</a>
+  {% endif %}
+  <span class="current">Page {{ products.number }} / {{ products.paginator.num_pages }}</span>
+  {% if products.has_next %}
+    <a href="?page={{ products.next_page_number }}">Suivante ›</a>
+    <a href="?page={{ products.paginator.num_pages }}">Dernière »</a>
+  {% endif %}
+</div>
+{% endif %}
