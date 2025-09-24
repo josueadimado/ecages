@@ -1,0 +1,102 @@
+{% extends "layouts/base_sales.html" %}
+{% block title %}Stocks (Direction Commerciale){% endblock %}
+{% block content %}
+<div class="page">
+  <div class="ribbon"><div class="marquee"><span>ECAGES • Stocks (Direction Commerciale)</span></div></div>
+
+  <div class="card" style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:16px;">
+    <form method="get" style="display:flex;flex-wrap:wrap;gap:12px;align-items:end;">
+      <div style="display:flex;flex-direction:column;min-width:220px;">
+        <label>Point de vente</label>
+        <select name="sp" style="height:40px;border:1px solid #d1d5db;border-radius:10px;padding:0 10px;">
+          <option value="0">Tous</option>
+          {% for sp in salespoints %}
+          <option value="{{ sp.id }}" {% if sp_id == sp.id %}selected{% endif %}>{{ sp.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="display:flex;flex-direction:column;min-width:140px;">
+        <label>Type</label>
+        <select name="type" style="height:40px;border:1px solid #d1d5db;border-radius:10px;padding:0 10px;">
+          <option value="all" {% if type=='all' %}selected{% endif %}>Tous</option>
+          <option value="piece" {% if type=='piece' %}selected{% endif %}>Pièces</option>
+          <option value="moto" {% if type=='moto' %}selected{% endif %}>Motos</option>
+        </select>
+      </div>
+      <div style="display:flex;flex-direction:column;min-width:160px;">
+        <label>Stock</label>
+        <select name="stock" style="height:40px;border:1px solid #d1d5db;border-radius:10px;padding:0 10px;">
+          {% for s in 'all,low,zero,high,ok'.split(',') %}
+          <option value="{{ s }}" {% if stock_filter==s %}selected{% endif %}>{{ s|upper }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="display:flex;flex-direction:column;min-width:220px;flex:1;">
+        <label>Recherche</label>
+        <input type="text" name="q" value="{{ q|default:'' }}" placeholder="Produit ou marque…" style="height:40px;border:1px solid #d1d5db;border-radius:10px;padding:0 10px;" />
+      </div>
+      <div>
+        <button class="btn btn-primary" type="submit">Filtrer</button>
+        <a class="btn btn-secondary" href="?{% if sp_id %}sp={{ sp_id }}&{% endif %}{% if type %}type={{ type }}&{% endif %}{% if stock_filter %}stock={{ stock_filter }}&{% endif %}{% if q %}q={{ q }}&{% endif %}export=csv">Exporter CSV</a>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <table class="table" style="width:100%;border-collapse:collapse;">
+      <thead>
+        <tr>
+          <th style="text-align:left;padding:10px;border-bottom:1px solid #f1f5f9;">Point de vente</th>
+          <th style="text-align:left;padding:10px;border-bottom:1px solid #f1f5f9;">Produit</th>
+          <th style="text-align:left;padding:10px;border-bottom:1px solid #f1f5f9;">Marque</th>
+          <th style="text-align:right;padding:10px;border-bottom:1px solid #f1f5f9;">Ouverture</th>
+          <th style="text-align:right;padding:10px;border-bottom:1px solid #f1f5f9;">Entrées</th>
+          <th style="text-align:right;padding:10px;border-bottom:1px solid #f1f5f9;">Sorties</th>
+          <th style="text-align:right;padding:10px;border-bottom:1px solid #f1f5f9;">Restant</th>
+          <th style="text-align:right;padding:10px;border-bottom:1px solid #f1f5f9;">Disponible</th>
+          <th style="text-align:center;padding:10px;border-bottom:1px solid #f1f5f9;">Statut</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td style="padding:10px;border-bottom:1px solid #f1f5f9;">{{ r.salespoint.name }}</td>
+          <td style="padding:10px;border-bottom:1px solid #f1f5f9;">{{ r.product.name }}</td>
+          <td style="padding:10px;border-bottom:1px solid #f1f5f9;">{{ r.brand }}</td>
+          <td style="padding:10px;text-align:right;border-bottom:1px solid #f1f5f9;">{{ r.opening }}</td>
+          <td style="padding:10px;text-align:right;border-bottom:1px solid #f1f5f9;">{{ r.in_qty }}</td>
+          <td style="padding:10px;text-align:right;border-bottom:1px solid #f1f5f9;">{{ r.out_qty }}</td>
+          <td style="padding:10px;text-align:right;border-bottom:1px solid #f1f5f9; font-weight:700;">{{ r.remaining }}</td>
+          <td style="padding:10px;text-align:right;border-bottom:1px solid #f1f5f9;">{{ r.available }}</td>
+          <td style="padding:10px;text-align:center;border-bottom:1px solid #f1f5f9;">
+            {% if r.status == 'zero' %}<span class="status sent">Épuisé</span>
+            {% elif r.status == 'low' %}<span class="status partially_validated">Bas</span>
+            {% elif r.status == 'high' %}<span class="status validated">Haut</span>
+            {% else %}<span class="status">OK</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="9" style="text-align:center; padding:24px; color:#64748b;">Aucune ligne</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% if page_obj.has_other_pages %}
+    <div class="pagination" style="display:flex; gap:8px; justify-content:center; margin-top:12px;">
+      {% if page_obj.has_previous %}
+        <a class="btn-secondary" href="?page=1">« Première</a>
+        <a class="btn-secondary" href="?page={{ page_obj.previous_page_number }}">‹ Précédente</a>
+      {% endif %}
+      <span class="btn-secondary" style="background:#580706;color:#fff;border-color:#580706;">Page {{ page_obj.number }} / {{ paginator.num_pages }}</span>
+      {% if page_obj.has_next %}
+        <a class="btn-secondary" href="?page={{ page_obj.next_page_number }}">Suivante ›</a>
+        <a class="btn-secondary" href="?page={{ paginator.num_pages }}">Dernière »</a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+

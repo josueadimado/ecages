@@ -2682,3 +2682,83 @@ def commercial_journal(request):
         'back_url': reverse('sales:commercial_dashboard'),
     }
     return render(request, 'sales/commercial/commercial_journal.html', context)
+
+
+@login_required
+def commercial_stock(request):
+    """Stock overview for Commercial Director: warehouse + all salespoints with filters and export."""
+    if not (request.user.is_superuser or getattr(request.user, 'role', '') == 'commercial_dir'):
+        return redirect('sales:dashboard')
+
+    from apps.inventory.models import SalesPoint, SalesPointStock
+
+    sp_id = int(request.GET.get('sp') or 0)
+    product_type = (request.GET.get('type') or 'all').strip()
+    stock_filter = (request.GET.get('stock') or 'all').strip()  # all|low|zero|high
+    q = (request.GET.get('q') or '').strip()
+    export = (request.GET.get('export') or '').strip() == 'csv'
+
+    sps = SalesPoint.objects.order_by('is_warehouse').order_by('name')
+    rows_qs = SalesPointStock.objects.select_related('salespoint','product','product__brand')
+    if sp_id:
+        rows_qs = rows_qs.filter(salespoint_id=sp_id)
+    if product_type in {'piece','moto'}:
+        rows_qs = rows_qs.filter(product__product_type=product_type)
+    if q:
+        rows_qs = rows_qs.filter(Q(product__name__icontains=q) | Q(product__brand__name__icontains=q))
+
+    rows = []
+    for sps_row in rows_qs.order_by('salespoint__is_warehouse','salespoint__name','product__name')[:5000]:
+        remaining = int(getattr(sps_row, 'remaining_qty', 0) or 0)
+        available = int(getattr(sps_row, 'available_qty', 0) or 0)
+        alert = int(getattr(sps_row, 'alert_qty', 5) or 5)
+        status = 'high' if remaining > alert*3 else ('low' if 0 < remaining <= alert else ('zero' if remaining == 0 else 'ok'))
+        if stock_filter != 'all' and status != stock_filter:
+            continue
+        rows.append({
+            'salespoint': sps_row.salespoint,
+            'product': sps_row.product,
+            'brand': getattr(getattr(sps_row.product,'brand',None),'name',''),
+            'remaining': remaining,
+            'available': available,
+            'opening': int(getattr(sps_row,'opening_qty',0) or 0),
+            'in_qty': int(getattr(sps_row,'transfer_in',0) or 0),
+            'out_qty': int(getattr(sps_row,'transfer_out',0) or 0),
+            'status': status,
+        })
+
+    if export:
+        import csv
+        from django.http import HttpResponse
+        resp = HttpResponse(content_type='text/csv')
+        resp['Content-Disposition'] = 'attachment; filename=stock_commercial.csv'
+        w = csv.writer(resp)
+        w.writerow(['Point de vente','Produit','Marque','Restant','Disponible','Ouverture','Entrées','Sorties','Statut'])
+        for r in rows:
+            w.writerow([r['salespoint'].name, r['product'].name, r['brand'], r['remaining'], r['available'], r['opening'], r['in_qty'], r['out_qty'], r['status']])
+        return resp
+
+    # Pagination simple
+    from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+    try:
+        per = int(request.GET.get('per') or 50)
+    except Exception:
+        per = 50
+    paginator = Paginator(rows, per)
+    page_num = request.GET.get('page') or 1
+    try:
+        page = paginator.get_page(page_num)
+    except (PageNotAnInteger, EmptyPage):
+        page = paginator.get_page(1)
+
+    return render(request, 'sales/commercial/commercial_stock.html', {
+        'rows': page.object_list,
+        'page_obj': page,
+        'paginator': paginator,
+        'sp_id': sp_id,
+        'salespoints': sps,
+        'q': q,
+        'type': product_type,
+        'stock_filter': stock_filter,
+        'per': per,
+    })
