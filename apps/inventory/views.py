@@ -655,6 +655,8 @@ def api_wh_restock_lines(request, req_id: int):
                 'product_id': it.product_id,
                 'product': f"{it.product.name} {('• ' + it.product.brand.name) if it.product.brand_id else ''}",
                 'qty': int(it.quantity or 0),
+                'status': 'validated' if getattr(it, 'validated_at', None) else 'pending',
+                'qty_validated': int(getattr(it, 'quantity_validated', 0) or 0),
             })
     else:
         for ln in req.lines.select_related('product','product__brand').all():
@@ -663,6 +665,8 @@ def api_wh_restock_lines(request, req_id: int):
                 'product_id': ln.product_id,
                 'product': f"{ln.product.name} {('• ' + ln.product.brand.name) if ln.product.brand_id else ''}",
                 'qty': qty,
+                'status': 'validated' if getattr(ln, 'validated_at', None) else 'pending',
+                'qty_validated': int(getattr(ln, 'quantity_approved', 0) or 0),
             })
     return JsonResponse({'ok': True, 'reference': req.reference or '', 'provider': getattr(req.provider, 'name', ''), 'lines': lines})
 
@@ -1850,6 +1854,27 @@ def api_wh_restock_validate(request, req_id: int):
                 )
 
             moved.append({'product_id': pid, 'qty': qty})
+
+            # Mark line as validated for status reporting
+            now_ts = timezone.now()
+            if cd_items:
+                try:
+                    # obj is RestockRequestItem
+                    obj.quantity_validated = qty
+                    obj.validated_at = now_ts
+                    obj.validated_by = request.user
+                    obj.save(update_fields=['quantity_validated', 'validated_at', 'validated_by'])
+                except Exception:
+                    pass
+            else:
+                try:
+                    # obj is RestockLine
+                    if not getattr(obj, 'quantity_approved', None):
+                        obj.quantity_approved = qty
+                    obj.validated_at = now_ts
+                    obj.save(update_fields=['quantity_approved', 'validated_at'])
+                except Exception:
+                    pass
 
         # Update request status
         req.status = 'validated'
