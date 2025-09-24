@@ -301,7 +301,7 @@
     (function(){
       const sidebar = document.getElementById('sidebar');
       const btn = document.getElementById('btnSidebar');
-      const ribbon = document.getElementById('ribbonText');
+      const ribbon = document.getElementById('ribbonText') || document.querySelector('.ribbon .marquee span');
 
       // Mobile sidebar toggle (same behavior as cashier)
       function isMobile(){ return matchMedia('(max-width: 720px)').matches }
@@ -319,15 +319,18 @@
         const dateStr = cap(d.toLocaleDateString('fr-FR',{weekday:'long',year:'numeric',month:'long',day:'numeric'}));
         const timeStr = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
         const spName = `{{ salespoint.name|default:'—' }}`;
+        const roleStr = `{{ request.user.role|default:''|lower }}`;
         
         // Check if we're on a warehouse manager page
         const isWarehousePage = window.location.pathname.includes('/inventory/warehouse/');
         
         if (ribbon) {
-          if (isWarehousePage) {
-            ribbon.textContent = `ECAGES • MAGASIN (DIRECTION GENERALE) • ${dateStr} — ${timeStr}   \u00A0\u00A0\u00A0`;
+          if (roleStr === 'commercial_dir') {
+            ribbon.textContent = `ECAGES - DIRECTION GENERAL - DIRECTEUR COMMERCIAL • ${dateStr} — ${timeStr}`;
+          } else if (isWarehousePage) {
+            ribbon.textContent = `ECAGES • MAGASIN (DIRECTION GENERALE) • ${dateStr} — ${timeStr}`;
           } else {
-            ribbon.textContent = `ECAGES • ${spName} • ${dateStr} — ${timeStr}   \u00A0\u00A0\u00A0`;
+            ribbon.textContent = `ECAGES • ${spName} • ${dateStr} — ${timeStr}`;
           }
         }
       }
