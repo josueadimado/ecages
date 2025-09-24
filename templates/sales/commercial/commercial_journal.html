@@ -32,15 +32,15 @@
       <select name="provider">
         <option value="0">Fournisseur (tous)</option>
         {% for p in providers %}
-        <option value="{{ p.id }}" {% if provider_id==p.id %}selected{% endif %}>{{ p.name }}</option>
+        <option value="{{ p.id }}" {% if provider_id == p.id %}selected{% endif %}>{{ p.name }}</option>
         {% endfor %}
       </select>
       <input type="date" name="from" value="{{ date_from }}" />
       <input type="date" name="to" value="{{ date_to }}" />
       <select name="per">
-        {% for n in 25 50 100 %}
-        <option value="{{ n }}" {% if per==n %}selected{% endif %}>{{ n }}/page</option>
-        {% endfor %}
+        <option value="25" {% if per == 25 %}selected{% endif %}>25/page</option>
+        <option value="50" {% if per == 50 %}selected{% endif %}>50/page</option>
+        <option value="100" {% if per == 100 %}selected{% endif %}>100/page</option>
       </select>
       <button class="btn-primary" type="submit">Filtrer</button>
       <a href="{{ back_url }}" class="btn-secondary">Retour</a>
