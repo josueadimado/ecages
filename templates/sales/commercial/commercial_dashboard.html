@@ -29,6 +29,13 @@
   .restock-section { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-top: 20px; }
   .restock-title { font-size: 1.2rem; font-weight: 800; color: #1e293b; margin-bottom: 12px; }
   .restock-buttons { display: flex; gap: 12px; }
+  /* Notification cards */
+  .notice-container { position: relative; margin-bottom: 16px; }
+  .notice-card { display:flex; gap:12px; align-items:flex-start; background:#ecfeff; border:1px solid #06b6d4; color:#0e7490; padding:12px 14px; border-radius:10px; box-shadow:0 1px 2px rgba(0,0,0,0.06); }
+  .notice-card.success { background:#ecfdf5; border-color:#10b981; color:#047857; }
+  .notice-card.error { background:#fef2f2; border-color:#ef4444; color:#991b1b; }
+  .notice-card .notice-title { font-weight:800; margin-right:6px; }
+  .notice-card .notice-close { margin-left:auto; background:transparent; border:none; color:inherit; cursor:pointer; font-weight:700; }
 </style>
 {% endblock %}
 
@@ -39,6 +46,9 @@
       <span id="ribbonText">ECAGES • Tableau de bord Commercial</span>
     </div>
   </div>
+
+  <!-- Notification area -->
+  <div id="noticeContainer" class="notice-container"></div>
 
   <!-- Statistics -->
   <div class="stats-grid">

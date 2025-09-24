@@ -137,8 +137,13 @@ async function submitPriceModal(){
     const url = document.getElementById('priceModal').dataset.apiPrice;
     const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken': __csrftoken}, credentials:'same-origin', body: JSON.stringify(payload)});
     const res = await r.json();
-    if(r.ok && res.ok){ alert('Demande envoyée pour approbation.'); closePriceModal(); }
-    else{ alert(res.error||'Erreur lors de la demande.'); }
+    if(r.ok && res.ok){ 
+      closePriceModal();
+      showNotice('Succès', 'La demande de modification de prix a été envoyée pour approbation.', 'success');
+    }
+    else{ 
+      showNotice('Erreur', res.error||'Erreur lors de la demande.', 'error');
+    }
   }catch(e){ alert('Erreur réseau.'); }
 }
 
@@ -184,6 +189,25 @@ async function submitRestockUI(){
   if (typeof window.submitRestock === 'function') {
     await window.submitRestock();
   }
+}
+
+// Notification card renderer
+function showNotice(title, message, level){
+  const container = document.getElementById('noticeContainer');
+  if(!container) return;
+  const card = document.createElement('div');
+  card.className = 'notice-card' + (level ? ' ' + level : '');
+  card.innerHTML = `
+    <div class="notice-title">${title}</div>
+    <div class="notice-message">${message}</div>
+    <button class="notice-close" aria-label="Fermer">✕</button>
+  `;
+  const closeBtn = card.querySelector('.notice-close');
+  closeBtn.addEventListener('click', ()=>{ card.remove(); });
+  container.innerHTML = '';
+  container.appendChild(card);
+  // Auto dismiss after 6 seconds
+  setTimeout(()=>{ if(card && card.parentNode){ card.remove(); } }, 6000);
 }
 
 
