@@ -647,13 +647,22 @@ def api_wh_restock_lines(request, req_id: int):
         return JsonResponse({'ok': False, 'error': 'Accès refusé.'}, status=403)
     req = get_object_or_404(RestockRequest.objects.select_related('provider'), pk=req_id)
     lines = []
-    for ln in req.lines.select_related('product','product__brand').all():
-        qty = int(ln.quantity or ln.quantity_requested or 0)
-        lines.append({
-            'product_id': ln.product_id,
-            'product': f"{ln.product.name} {('• ' + ln.product.brand.name) if ln.product.brand_id else ''}",
-            'qty': qty,
-        })
+    # For Commercial Director inbound, lines are stored in req.items
+    if hasattr(req, 'items') and req.items.exists():
+        for it in req.items.select_related('product','product__brand').all():
+            lines.append({
+                'product_id': it.product_id,
+                'product': f"{it.product.name} {('• ' + it.product.brand.name) if it.product.brand_id else ''}",
+                'qty': int(it.quantity or 0),
+            })
+    else:
+        for ln in req.lines.select_related('product','product__brand').all():
+            qty = int(ln.quantity or ln.quantity_requested or 0)
+            lines.append({
+                'product_id': ln.product_id,
+                'product': f"{ln.product.name} {('• ' + ln.product.brand.name) if ln.product.brand_id else ''}",
+                'qty': qty,
+            })
     return JsonResponse({'ok': True, 'reference': req.reference or '', 'provider': getattr(req.provider, 'name', ''), 'lines': lines})
 
 
