@@ -19,3 +19,12 @@ if os.path.isfile(_legacy_path):
                 globals()[_name] = getattr(_legacy, _name)
 
 
+# Also import modular commercial views and expose them at package level
+try:
+    from . import commercial as _commercial
+    for _name in dir(_commercial):
+        if not _name.startswith('_'):
+            globals()[_name] = getattr(_commercial, _name)
+except Exception:
+    pass
+
