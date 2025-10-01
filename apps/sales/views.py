@@ -2693,13 +2693,20 @@ def commercial_stock(request):
     from apps.inventory.models import SalesPoint, SalesPointStock
 
     sp_id = int(request.GET.get('sp') or 0)
+    view = (request.GET.get('view') or 'all').strip()  # all|warehouse|salespoint
     product_type = (request.GET.get('type') or 'all').strip()
-    stock_filter = (request.GET.get('stock') or 'all').strip()  # all|low|zero|high
+    stock_filter = (request.GET.get('stock') or 'all').strip()  # all|low|zero|high|ok
     q = (request.GET.get('q') or '').strip()
     export = (request.GET.get('export') or '').strip() == 'csv'
+    sort = (request.GET.get('sort') or '').strip()  # remaining|available|in|out|sp|product
+    order = (request.GET.get('order') or 'desc').strip()  # asc|desc
 
-    sps = SalesPoint.objects.order_by('is_warehouse').order_by('name')
+    sps = SalesPoint.objects.order_by('is_warehouse', 'name')
     rows_qs = SalesPointStock.objects.select_related('salespoint','product','product__brand')
+    if view == 'warehouse':
+        rows_qs = rows_qs.filter(salespoint__is_warehouse=True)
+    elif view == 'salespoint':
+        rows_qs = rows_qs.filter(salespoint__is_warehouse=False)
     if sp_id:
         rows_qs = rows_qs.filter(salespoint_id=sp_id)
     if product_type in {'piece','moto'}:
@@ -2708,6 +2715,7 @@ def commercial_stock(request):
         rows_qs = rows_qs.filter(Q(product__name__icontains=q) | Q(product__brand__name__icontains=q))
 
     rows = []
+    counts = {'total': 0, 'zero': 0, 'low': 0, 'high': 0, 'ok': 0}
     for sps_row in rows_qs.order_by('salespoint__is_warehouse','salespoint__name','product__name')[:5000]:
         remaining = int(getattr(sps_row, 'remaining_qty', 0) or 0)
         available = int(getattr(sps_row, 'available_qty', 0) or 0)
@@ -2715,7 +2723,7 @@ def commercial_stock(request):
         status = 'high' if remaining > alert*3 else ('low' if 0 < remaining <= alert else ('zero' if remaining == 0 else 'ok'))
         if stock_filter != 'all' and status != stock_filter:
             continue
-        rows.append({
+        row = {
             'salespoint': sps_row.salespoint,
             'product': sps_row.product,
             'brand': getattr(getattr(sps_row.product,'brand',None),'name',''),
@@ -2725,7 +2733,23 @@ def commercial_stock(request):
             'in_qty': int(getattr(sps_row,'transfer_in',0) or 0),
             'out_qty': int(getattr(sps_row,'transfer_out',0) or 0),
             'status': status,
-        })
+        }
+        rows.append(row)
+        counts['total'] += 1
+        counts[status] = counts.get(status, 0) + 1
+
+    # Sorting
+    key_map = {
+        'remaining': 'remaining',
+        'available': 'available',
+        'in': 'in_qty',
+        'out': 'out_qty',
+        'sp': lambda r: r['salespoint'].name.lower(),
+        'product': lambda r: r['product'].name.lower(),
+    }
+    if sort in key_map:
+        k = key_map[sort]
+        rows.sort(key=(k if isinstance(k, str) else k), reverse=(order != 'asc'))
 
     if export:
         import csv
@@ -2758,7 +2782,117 @@ def commercial_stock(request):
         'sp_id': sp_id,
         'salespoints': sps,
         'q': q,
+        'view': view,
         'type': product_type,
         'stock_filter': stock_filter,
         'per': per,
+        'counts': counts,
+        'sort': sort,
+        'order': order,
+    })
+
+@login_required
+def commercial_restock_stats(request):
+    """Commercial Director: Statistics of restocking by product for warehouse and salespoints.
+    Shows each restock event (date, product, quantity, destination), with filters and CSV export.
+    """
+    if not (request.user.is_superuser or getattr(request.user, 'role', '') == 'commercial_dir'):
+        return redirect('sales:dashboard')
+
+    from django.db.models import Q, F
+    from apps.inventory.models import RestockRequest, RestockLine, SalesPoint
+
+    scope = (request.GET.get('scope') or 'salespoint').strip()  # 'salespoint' | 'warehouse'
+    sp_id = int(request.GET.get('sp') or 0)
+    q = (request.GET.get('q') or '').strip()
+    ptype = (request.GET.get('type') or 'all').strip()  # 'all' | 'piece' | 'moto'
+    df = (request.GET.get('from') or '').strip()
+    dt = (request.GET.get('to') or '').strip()
+    export = (request.GET.get('export') or '') == 'csv'
+
+    # Base queryset: join RestockLine -> RestockRequest
+    rl = RestockLine.objects.select_related(
+        'product', 'product__brand', 'request', 'request__salespoint'
+    ).all()
+
+    # Filter by scope: warehouse inbounds created by CD typically use reference starting with 'CD-'
+    if scope == 'warehouse':
+        rl = rl.filter(request__reference__startswith='CD-')
+    else:
+        # Salespoints restocked by warehouse: exclude warehouse-internal and CD inbound
+        rl = rl.exclude(request__reference__startswith='WH-RQ-').exclude(request__reference__startswith='CD-')
+
+    if sp_id:
+        rl = rl.filter(request__salespoint_id=sp_id)
+
+    if ptype in ('piece', 'moto'):
+        rl = rl.filter(product__product_type=ptype)
+
+    if q:
+        rl = rl.filter(Q(product__name__icontains=q) | Q(product__brand__name__icontains=q))
+
+    # Date range filters (by request.created_at)
+    from django.utils.dateparse import parse_date
+    start_date = parse_date(df) if df else None
+    end_date = parse_date(dt) if dt else None
+    if start_date:
+        rl = rl.filter(request__created_at__date__gte=start_date)
+    if end_date:
+        rl = rl.filter(request__created_at__date__lte=end_date)
+
+    # Build rows list for template/export
+    rows = []
+    for line in rl.order_by('-request__created_at')[:5000]:
+        rows.append({
+            'date': line.request.created_at,
+            'salespoint': line.request.salespoint,
+            'product': line.product,
+            'brand': getattr(line.product.brand, 'name', ''),
+            'qty': line.effective_quantity,
+            'status': line.request.status,
+        })
+
+    # CSV export (all filtered rows)
+    if export:
+        import csv
+        from django.http import HttpResponse
+        resp = HttpResponse(content_type='text/csv')
+        resp['Content-Disposition'] = 'attachment; filename=stats_ravitaillement.csv'
+        w = csv.writer(resp)
+        w.writerow(['Date','Point de vente','Produit','Marque','Quantité','Statut'])
+        for r in rows:
+            w.writerow([
+                r['date'].strftime('%Y-%m-%d %H:%M'),
+                r['salespoint'].name if r['salespoint'] else '—',
+                r['product'].name,
+                r['brand'],
+                r['qty'],
+                r['status'],
+            ])
+        return resp
+
+    # Pagination
+    from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+    try:
+        per = int(request.GET.get('per') or 50)
+    except Exception:
+        per = 50
+    paginator = Paginator(rows, per)
+    page_num = request.GET.get('page') or 1
+    try:
+        page = paginator.get_page(page_num)
+    except (PageNotAnInteger, EmptyPage):
+        page = paginator.get_page(1)
+
+    return render(request, 'sales/commercial/commercial_restock_stats.html', {
+        'rows': page.object_list,
+        'page_obj': page,
+        'paginator': paginator,
+        'salespoints': SalesPoint.objects.order_by('is_warehouse', 'name'),
+        'sp_id': sp_id,
+        'q': q,
+        'type': ptype,
+        'scope': scope,
+        'date_from': df,
+        'date_to': dt,
     })
